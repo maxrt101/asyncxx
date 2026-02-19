@@ -96,6 +96,7 @@ inline void run(const Task::Worker& fn) {
 
   loop->addTask(fn);
   loop->runUntilCompleted();
+  loop->clear();
 }
 
 }
