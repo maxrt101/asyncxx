@@ -94,6 +94,29 @@ inline std::vector<std::string> splitQuoted(const std::string& str, const char d
 }
 
 
+inline std::string escape(const std::string& str) {
+  std::string out;
+  out.reserve(str.size());
+  for (unsigned char c : str) {
+    switch (c) {
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      case '\\': out += "\\\\"; break;
+      case '\"': out += "\\\""; break;
+      default:
+        if (c < 32 || c > 126) {
+          // For non-printable chars, use hex format
+          out += std::format("\\x{:02x}", (int)c);
+        } else {
+          out += c;
+        }
+    }
+  }
+  return out;
+}
+
+
 }
 
 }
