@@ -4,6 +4,7 @@
 #include <format>
 #include <print>
 #include <string>
+#include <async/util.h>
 
 #define ANSI_TEXT_RESET       "\x1b[0m"
 #define ANSI_TEXT_BOLD        "\x1b[1m"
@@ -51,6 +52,18 @@
     }                                                                         \
   } while (0)
 
+#define TEST_ASSERT_EQ(__lhs, __rhs, __msg_fmt, ...)                          \
+  do {                                                                        \
+    if ((__lhs) != (__rhs)) {                                                 \
+      throw test::AssertionEqualityError(                                     \
+        __FILE__, __LINE__,                                                   \
+        test::impl::to_string(__lhs),                                                               \
+        test::impl::to_string(__rhs),                                                               \
+        std::format(__msg_fmt, ## __VA_ARGS__)                                \
+      );                                                                      \
+    }                                                                         \
+  } while (0)
+
 namespace test {
 
 struct AssertionError final : std::runtime_error {
@@ -65,6 +78,24 @@ struct AssertionError final : std::runtime_error {
           "' failed at " TEST_LOC_FMT " with message '"
           ANSI_TEXT_BOLD "{}" ANSI_TEXT_RESET "'",
           expr, file, line, message
+        )
+      ) {}
+};
+
+struct AssertionEqualityError final : std::runtime_error {
+  explicit AssertionEqualityError(
+    const std::string& file,
+    int                line,
+    const std::string& lhs,
+    const std::string& rhs,
+    const std::string& message
+  ) : std::runtime_error(
+        std::format(
+          "'" ANSI_TEXT_BOLD "{}" ANSI_TEXT_RESET
+          "' != '" ANSI_TEXT_BOLD "{}" ANSI_TEXT_RESET
+          " at " TEST_LOC_FMT ". Message: '"
+          ANSI_TEXT_BOLD "{}" ANSI_TEXT_RESET "'",
+          lhs, rhs, file, line, message
         )
       ) {}
 };
@@ -116,6 +147,15 @@ inline void reportError(Statistics& stat, Test * test, size_t name_sz, size_t de
   stat.errors++;
 }
 
+template <typename T>
+std::string to_string(const T& val) {
+  if constexpr (std::is_convertible_v<T, std::string>) {
+    return async::str::escape(static_cast<std::string>(val));
+  } else {
+    return std::format("{}", val);
+  }
+}
+
 }
 
 inline int run(TestSuite * suite) {
@@ -138,6 +178,9 @@ inline int run(TestSuite * suite) {
       test->fn(suite);
       impl::reportSuccess(stat, test, max_name_size, max_desc_size);
     } catch (AssertionError& e) {
+      std::print("[" ANSI_COLOR_BG_RED "ASSERT" ANSI_TEXT_RESET "] {}\n", e.what());
+      impl::reportFailure(stat, test, max_name_size, max_desc_size);
+    } catch (AssertionEqualityError& e) {
       std::print("[" ANSI_COLOR_BG_RED "ASSERT" ANSI_TEXT_RESET "] {}\n", e.what());
       impl::reportFailure(stat, test, max_name_size, max_desc_size);
     } catch (std::exception& e) {
