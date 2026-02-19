@@ -15,6 +15,10 @@ public:
   Event() = default;
   ~Event() = default;
 
+  static std::shared_ptr<Event> create() {
+    return std::make_shared<Event>();
+  }
+
   bool notifyOne() {
     auto lock = std::unique_lock(waiters.mutex);
 
