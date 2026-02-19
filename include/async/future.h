@@ -7,6 +7,14 @@
 
 namespace async {
 
+struct FutureNotReadyException final : std::runtime_error {
+  FutureNotReadyException() : std::runtime_error("Future must be completed to perform this action") {}
+};
+
+struct FutureFailedToCompleteException final : std::runtime_error {
+  FutureFailedToCompleteException() : std::runtime_error("Future failed to complete") {}
+};
+
 template <typename T = void>
 class Future {
   struct Empty {};
@@ -28,11 +36,17 @@ public:
       waiters(),
       result() {}
 
+  static std::shared_ptr<Future> create() {
+    return std::make_shared<Future>();
+  }
+
   bool is_completed() const {
     return completed.load();
   }
 
   auto get() {
+    if (!is_completed()) throw FutureNotReadyException();
+
     if constexpr (!std::is_void_v<T>) {
       return result;
     }
@@ -59,7 +73,7 @@ public:
     saveWaiter();
     wait();
 
-    if (!is_completed()) throw std::runtime_error("failed");
+    if (!is_completed()) throw FutureFailedToCompleteException();
 
     if constexpr (!std::is_void_v<T>) {
       return result;
