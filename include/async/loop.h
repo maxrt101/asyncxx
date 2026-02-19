@@ -50,6 +50,7 @@ public:
     tasks.clear();
     stack = nullptr;
     current = 0;
+    running = true;
   }
 
   TaskId addTask(const Task::Worker& fn) {
@@ -61,9 +62,28 @@ public:
     return id;
   }
 
+  TaskId addTask(const Task::Worker& fn, const std::string& name) {
+    const auto id = task_id_counter++;
+    auto t = new Task(id, fn, name);
+
+    std::lock_guard lock(sync.mutex);
+    sync.to_start.push_back(t);
+    return id;
+  }
+
   Task * getTask(const TaskId id) const {
     for (auto& task : tasks) {
       if (task->getId() == id) {
+        return task;
+      }
+    }
+
+    return nullptr;
+  }
+
+  Task * getTask(const std::string& name) const {
+    for (auto& task : tasks) {
+      if (task->name == name) {
         return task;
       }
     }
@@ -115,6 +135,8 @@ public:
     }
 
     if (task->state == Task::State::DONE) {
+      platform::set_stack(stack);
+
 #if VALGRIND_DEBUG
       VALGRIND_STACK_DEREGISTER(task->stack.id);
 #endif
@@ -124,7 +146,6 @@ public:
       tasks.erase(tasks.begin() + current);
       if (tasks.size() == 0) running = false;
 
-      platform::set_stack(stack);
       return;
     }
 
