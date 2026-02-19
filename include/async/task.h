@@ -5,6 +5,10 @@
 #include <cstdint>
 #include <csetjmp>
 
+#ifndef ASYNC_TASK_DEFAULT_STACK_SIZE
+#define ASYNC_TASK_DEFAULT_STACK_SIZE 65536
+#endif
+
 namespace async {
 
 using TaskId = int64_t;
@@ -39,10 +43,10 @@ private:
   } stack;
 
 public:
-  Task(const TaskId id, Worker worker, const size_t stack_size = 8192)
+  Task(const TaskId id, Worker worker, const std::string& name = "<?>", const size_t stack_size = ASYNC_TASK_DEFAULT_STACK_SIZE)
     : state(State::INIT),
       id(id),
-      name("<?>"),
+      name(name),
       worker(std::move(worker)),
       ctx(),
       stack({.data = new uint8_t[stack_size], .size = stack_size}) {}
@@ -63,6 +67,10 @@ public:
 
   [[nodiscard]] TaskId getId() const {
     return id;
+  }
+
+  [[nodiscard]] State getState() const {
+    return state;
   }
 
 private:
