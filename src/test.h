@@ -93,7 +93,7 @@ namespace impl {
 struct Statistics {
   size_t passed = 0;
   size_t failed = 0;
-  size_t errored = 0;
+  size_t errors = 0;
 };
 
 inline int registerTest(TestSuite * suite, TestFunction fn, std::string name, std::string desc) {
@@ -113,7 +113,7 @@ inline void reportFailure(Statistics& stat, Test * test, size_t name_sz, size_t 
 
 inline void reportError(Statistics& stat, Test * test, size_t name_sz, size_t desc_sz) {
   std::print("[ " ANSI_COLOR_FG_YELLOW "FAIL" ANSI_TEXT_RESET " ] {:<{}} - {:<{}}\n", test->name, name_sz, test->desc, desc_sz);
-  stat.errored++;
+  stat.errors++;
 }
 
 }
@@ -148,9 +148,9 @@ inline int run(TestSuite * suite) {
     }
   }
 
-  std::print("Passed:  " ANSI_COLOR_FG_GREEN "{}" ANSI_TEXT_RESET "\n", stat.passed);
-  std::print("Failed:  " ANSI_COLOR_FG_RED "{}" ANSI_TEXT_RESET "\n", stat.failed);
-  std::print("Errored: " ANSI_COLOR_FG_YELLOW "{}" ANSI_TEXT_RESET "\n", stat.errored);
+  std::print("Passed: " ANSI_COLOR_FG_GREEN  "{}" ANSI_TEXT_RESET "\n", stat.passed);
+  std::print("Failed: " ANSI_COLOR_FG_RED    "{}" ANSI_TEXT_RESET "\n", stat.failed);
+  std::print("Errors: " ANSI_COLOR_FG_YELLOW "{}" ANSI_TEXT_RESET "\n", stat.errors);
 
   return stat.failed > 0 ? 1 : 0;
 }
