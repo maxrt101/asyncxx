@@ -3,9 +3,12 @@
 
 auto async_tests = test::TestSuite("async");
 
-int main() {
-  // signal(SIGCHLD, SIG_IGN);
-  // signal(SIGPIPE, SIG_IGN);
+int main(int argc, char ** argv) {
+  std::vector<std::string> tests;
 
-  return test::run(&async_tests);
+  for (int i = 1; i < argc; ++i) {
+    tests.push_back(argv[i]);
+  }
+
+  return test::run(&async_tests, tests);
 }

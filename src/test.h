@@ -205,13 +205,27 @@ inline void reportError(Statistics& stat, Test * test, size_t name_sz, size_t de
 
 }
 
-inline int run(TestSuite * suite) {
-  impl::print("Running {} tests from suite {}:\n", suite->tests.size(), suite->name);
+inline int run(TestSuite * suite, std::vector<std::string> to_run = {}) {
+  auto has_to_run = [&to_run](const std::string& name) {
+    return std::find(to_run.begin(), to_run.end(), name) != to_run.end();
+  };
+
+  if (to_run.empty()) {
+    std::transform(
+      suite->tests.begin(),
+      suite->tests.end(),
+      std::back_inserter(to_run),
+      [](auto& v) { return v.name; }
+    );
+  }
+
+  impl::print("Running {}/{} tests from suite {}:\n", to_run.size(), suite->tests.size(), suite->name);
 
   size_t max_name_size = 0;
   size_t max_desc_size = 0;
 
   for (auto& test : suite->tests) {
+    if (!has_to_run(test.name)) continue;
     max_name_size = std::max(max_name_size, test.name.size());
     max_desc_size = std::max(max_desc_size, test.desc.size());
   }
@@ -219,8 +233,9 @@ inline int run(TestSuite * suite) {
   auto stat = impl::Statistics();
 
   for (size_t i = 0; i < suite->tests.size(); ++i) {
-    suite->current = i;
     auto test = &suite->tests[i];
+    if (!has_to_run(test->name)) continue;
+    suite->current = i;
     try {
       test->fn(suite);
       impl::reportSuccess(stat, test, max_name_size, max_desc_size);
