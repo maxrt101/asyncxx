@@ -53,10 +53,10 @@ private:
   };
 
   struct Pipes {
-    int in[2];
-    int out[2];
-    int err[2];
-    int service[2];
+    int in[2]      = {-1, -1};
+    int out[2]     = {-1, -1};
+    int err[2]     = {-1, -1};
+    int service[2] = {-1, -1};
 
     const std::string& input;
 
@@ -70,17 +70,20 @@ private:
     }
 
     ~Pipes() {
-      closeFromParent();
+      for (auto& p : {in, out, err, service}) {
+        close_fd(p[0]);
+        close_fd(p[1]);
+      }
     }
 
     static std::shared_ptr<Pipes> create(const std::string& input) {
       return std::make_shared<Pipes>(input);
     }
 
-    static void close(int& fd) {
-      if (fd) {
+    static void close_fd(int& fd) {
+      if (fd >= 0) {
         ::close(fd);
-        fd = 0;
+        fd = -1;
       }
     }
 
@@ -93,13 +96,13 @@ private:
     }
 
     void prepareParent() {
-      close(out[1]);
-      close(err[1]);
-      close(in[0]);
+      close_fd(out[1]);
+      close_fd(err[1]);
+      close_fd(in[0]);
 
       if (!input.empty()) {
         write(in[1], input.c_str(), input.size());
-        close(in[1]);
+        close_fd(in[1]);
       }
     }
 
@@ -114,25 +117,12 @@ private:
     }
 
     void closeFromChild() {
-      // Close all, except for write end of service pipe
-      close(in[0]);
-      close(in[1]);
-      close(out[0]);
-      close(out[1]);
-      close(err[0]);
-      close(err[1]);
-      close(service[0]);
-    }
+      for (auto& p : {in, out, err}) {
+        close_fd(p[0]);
+        close_fd(p[1]);
+      }
 
-    void closeFromParent() {
-      // Close all, except for the ones used in IO struct
-      // those descriptors will be owned by File, and will
-      // get closed once the user discards Result/Process
-      close(in[0]);
-      close(out[1]);
-      close(err[1]);
-      close(service[0]);
-      close(service[1]);
+      close_fd(service[0]);
     }
   };
 
@@ -243,7 +233,7 @@ private:
 
       write(pipes->service[1], "1", 1);
 
-      ::exit(-1);
+      _exit(-1);
     }
 
     result->ok = true;
@@ -257,12 +247,16 @@ private:
 
     pipes->prepareParent();
 
-    if (pipes->in[1]) {
+    if (pipes->in[1] >= 0) {
       result->io->in = File::fd(pipes->in[1], "w");
+      pipes->in[1] = -1;
     }
 
     result->io->out = File::fd(pipes->out[0], "r");
+    pipes->out[0] = -1;
+
     result->io->err = File::fd(pipes->err[0], "r");
+    pipes->err[0] = -1;
 
     state = State::EXEC;
   }

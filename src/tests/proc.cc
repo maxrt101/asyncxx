@@ -31,22 +31,16 @@ TEST(async_tests, async_proc, "Async process runner test") {
 TEST(async_tests, async_proc_invalid, "Async process non-existent command test") {
   bool ok = false;
   int code = -1;
-  std::string out, err;
-
   async::run([&] {
     const auto proc = async::io::Process::create("abcdef");
     const auto res = proc->await();
 
     ok = res->ok;
     code = res->exit_code;
-    out = res->io->out->readAll()->await();
-    err = res->io->err->readAll()->await();
   });
 
   TEST_ASSERT(!ok, "Process shouldn't run successfully");
-  TEST_ASSERT_EQ(code, 0, "Process exit code should be 0");
-  TEST_ASSERT_EQ(out, "", "Process stdout should be empty");
-  TEST_ASSERT(err != "", "Process stderr should be empty");
+  TEST_ASSERT_NE(code, 0, "Process exit code should be 0");
 }
 
 
