@@ -22,11 +22,11 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt install cmake build-essential 
+        sudo apt install -y g++-14 cmake build-essential
 
     - name: Configure
       run: |
-        cmake -B cmake-build -S .
+        cmake -B cmake-build -S . -DCMAKE_CXX_COMPILER=g++-14
 
     - name: Build
       run: |
