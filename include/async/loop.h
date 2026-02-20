@@ -4,7 +4,9 @@
 #include <async/pool.h>
 #include <async/platform.h>
 
+#if VALGRIND_DEBUG
 #include <valgrind/valgrind.h>
+#endif
 
 namespace async {
 
@@ -127,7 +129,17 @@ public:
       platform::set_stack(reinterpret_cast<void*>(stack_top));
 
       task->state = Task::State::EXEC;
-      task->worker();
+
+      try {
+        task->worker();
+      } catch (...) {
+#if !ASYNC_CONTINUE_ON_TASK_EXC
+        task->state = Task::State::DONE;
+        platform::set_stack(stack);
+        throw;
+#endif
+      }
+
       task->state = Task::State::DONE;
 
       platform::set_stack(stack);
