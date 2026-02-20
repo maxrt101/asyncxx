@@ -32,7 +32,11 @@ jobs:
 
     - name: Configure
       run: |
-        cmake -B cmake-build -S . -DCMAKE_CXX_COMPILER=g++-14 -DCMAKE_C_COMPILER=gcc-14
+        cmake -B cmake-build -S . 
+      env:
+        CC: clang-20
+        CXX: clang++-20
+        LLVM_DIR: /usr/lib/llvm-20/lib/cmake/
 
     - name: Build
       run: |
