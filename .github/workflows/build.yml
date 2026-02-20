@@ -1,0 +1,37 @@
+name: Build asyncxx
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - '**.cc'
+      - '**.h'
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - '**.cc'
+      - '**.h'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt install cmake build-essential 
+
+    - name: Configure
+      run: |
+        cmake -B cmake-build -S .
+
+    - name: Build
+      run: |
+        cmake --build cmake-build
+
+    - name: Run Tests
+      run: |
+        ./cmake-build/async
