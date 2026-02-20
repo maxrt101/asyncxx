@@ -26,6 +26,15 @@ macro(project_add_src_recursive)
   endforeach ()
 endmacro()
 
+macro(feature name default)
+  if (DEFINED ENV{${name}})
+    set(${name} $ENV{${name}})
+  else()
+    set(${name} ${default})
+  endif ()
+  message(STATUS "Feature ${name} using value ${${name}}")
+endmacro()
+
 
 ################################    PROJECT    ################################
 if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
@@ -36,7 +45,8 @@ endif ()
 set(PROJECT_NAME       async)
 set(PROJECT_DIR        ${CMAKE_CURRENT_LIST_DIR})
 set(CMAKE_CXX_STANDARD 23)
-set(VALGRIND_DEBUG     0)
+
+feature(VALGRIND_DEBUG 0)
 
 project(${PROJECT_NAME})
 
@@ -54,6 +64,7 @@ if (${VALGRIND_DEBUG} EQUAL 1)
   include_directories(/usr/local/include)
   add_definitions(-DVALGRIND_DEBUG=1)
 endif ()
+
 
 ################################   EXECUTABLE   ################################
 add_executable(${PROJECT_NAME}
