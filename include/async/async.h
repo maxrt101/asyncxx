@@ -94,7 +94,7 @@ std::shared_ptr<Future<T>> task(F fn, Args... args) {
 inline void run(const Task::Worker& fn) {
   const auto loop = getGlobalLoop();
 
-  loop->addTask(fn);
+  loop->addTask(fn, "<run>");
   loop->runUntilCompleted();
   loop->clear();
 }
