@@ -147,12 +147,37 @@ inline void reportError(Statistics& stat, Test * test, size_t name_sz, size_t de
   stat.errors++;
 }
 
+template<typename T>
+concept StandardFormattable = requires(T v) {
+  std::format("{}", v);
+};
+
+template<typename T>
+concept IsIterable = requires(T t) {
+  std::begin(t);
+  std::end(t);
+} && !std::is_convertible_v<T, std::string>;
+
 template <typename T>
 std::string to_string(const T& val) {
   if constexpr (std::is_convertible_v<T, std::string>) {
     return async::str::escape(static_cast<std::string>(val));
-  } else {
+  } else if constexpr (std::is_integral_v<decltype(val)> && sizeof(val) == 1) {
+    return std::format("0x{:02x}", (uint8_t) val);
+  } else if constexpr (IsIterable<T>) {
+    std::string out = "[";
+    bool first = true;
+    for (const auto& item : val) {
+      if (!first) out += ", ";
+      out += to_string(item);
+      first = false;
+    }
+    out += "]";
+    return out;
+  } else if constexpr (StandardFormattable<T>) {
     return std::format("{}", val);
+  } else {
+    return "<?>";
   }
 }
 
