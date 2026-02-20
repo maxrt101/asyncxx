@@ -51,7 +51,7 @@ class File {
 public:
   File() : filename(""), handle(nullptr), flags(FLAG_NONE) {}
 
-  File(int fd, const std::string& mode) : filename(std::to_string(fd)), handle(nullptr), flags(FLAG_NONE) {
+  File(const int fd, const std::string& mode) : filename(std::to_string(fd)), handle(nullptr), flags(FLAG_NONE) {
     handle = fdopen(fd, mode.c_str());
     assertThrow(this->handle, FileOpenException(filename));
     setFlag(FLAG_OWNER, true);
@@ -200,10 +200,10 @@ public:
     });
   }
 
-  std::shared_ptr<Future<>> writeBytes(const uint8_t * buf, size_t n) const {
+  std::shared_ptr<Future<>> writeBytes(const std::vector<uint8_t>& buf) const {
     assertThrow(handle, FileNotOpenedException());
-    return async::task([this, buf, n] {
-      assertThrow(fwrite(buf, n, 1, this->handle) == 1, FileWriteException(filename));
+    return async::task([this, buf] {
+      assertThrow(fwrite(buf.data(), buf.size(), 1, this->handle) == 1, FileWriteException(filename));
     });
   }
 
