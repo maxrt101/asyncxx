@@ -28,10 +28,10 @@ TEST(async_tests, async_event, "Async event wait/notifyOne test") {
     async::run([] {
       auto ev = async::Event::create();
 
-      async::gather(
-        async_event_waiter(ev),
-        async_event_notifier(ev)
-      );
+      auto f1 = async_event_waiter(ev);
+      auto f2 = async_event_notifier(ev);
+
+      async::gather(f1, f2);
     });
 
     TEST_ASSERT(unlocked_through_event, "Task didn't finish");
@@ -65,11 +65,11 @@ TEST(async_tests, async_event_multi, "Async event wait/notifyAll test") {
     async::run([] {
       auto ev = async::Event::create();
 
-      async::gather(
-        async_event_waiter1(ev),
-        async_event_waiter2(ev),
-        async_event_notifier_multi(ev)
-      );
+      auto f1 = async_event_waiter1(ev);
+      auto f2 = async_event_waiter2(ev);
+      auto f3 = async_event_notifier_multi(ev);
+
+      async::gather(f1, f2, f3);
     });
 
     TEST_ASSERT(unlocked_through_event1, "Task 1 didn't finish");
@@ -100,10 +100,10 @@ TEST(async_tests, async_event_ensure, "Async event wait/ensureNotifyOne test") {
     async::run([] {
       auto ev = async::Event::create();
 
-      async::gather(
-        async_event_waiter_ensure(ev),
-        async_event_notifier_ensure(ev)
-      );
+      auto f1 = async_event_waiter_ensure(ev);
+      auto f2 = async_event_notifier_ensure(ev);
+
+      async::gather(f1, f2);
     });
 
     TEST_ASSERT(unlocked_through_event, "Task didn't finish");

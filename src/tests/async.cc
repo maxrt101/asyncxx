@@ -13,6 +13,18 @@ static bool task2_ran = false;
 static bool after_exit = false;
 static bool waiter_finished = false;
 
+template <>
+std::string test::impl::to_string(const async::Task::State& val) {
+  switch (val) {
+    case async::Task::State::NONE: return "NONE";
+    case async::Task::State::INIT: return "INIT";
+    case async::Task::State::EXEC: return "EXEC";
+    case async::Task::State::WAIT: return "WAIT";
+    case async::Task::State::DONE: return "DONE";
+    default:                       return "<?>";
+  }
+}
+
 
 TEST(async_tests, async_task, "Async task test") {
   bool has_ran = false;
@@ -47,7 +59,7 @@ TEST(async_tests, async_fn_ret, "Async task function that returns test") {
 
   async::run([&res] { res = async_task_ret_fn()->await(); });
 
-  TEST_ASSERT(res == 42, "Test function didn't run");
+  TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
 
 
@@ -60,7 +72,7 @@ TEST(async_tests, async_fn_arg, "Async task function that has args test") {
 
   async::run([] { async_task_arg_fn(42)->await(); });
 
-  TEST_ASSERT(async_result == 42, "Test function didn't run");
+  TEST_ASSERT_EQ(async_result, 42, "Test function didn't run");
 }
 
 
@@ -73,7 +85,7 @@ TEST(async_tests, async_fn_arg_ret, "Async task function that has args and retur
 
   async::run([&res] { res = async_task_arg_ret_fn(42)->await(); });
 
-  TEST_ASSERT(res == 42, "Test function didn't run");
+  TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
 
 
@@ -91,7 +103,7 @@ TEST(async_tests, async_await_val, "Async task await test (value)") {
 
   async::run([&res] { res = async_task_ret_fn()->await(); });
 
-  TEST_ASSERT(res == 42, "Test function didn't run");
+  TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
 
 
@@ -100,11 +112,11 @@ TEST(async_tests, async_yield, "Async task yield") {
 
   async::run([&res] {  async::yield(); res = 42; });
 
-  TEST_ASSERT(res == 42, "Test function didn't run");
+  TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
 
 
-async_task(async_yielder) {
+async_task_n(async_yielder, "yielder") {
   yield_counter = 1;
   async::yield();
   yield_counter = 2;
@@ -112,7 +124,7 @@ async_task(async_yielder) {
   yield_counter = 3;
 }
 
-async_task(async_checker) {
+async_task_n(async_checker, "checker") {
   has_yielded = yield_counter == 1;
 }
 
@@ -121,7 +133,9 @@ TEST(async_tests, async_yield_2, "Async task yield (multi-stage)") {
   has_yielded = false;
 
   async::run([] {
-    async::gather(async_yielder(), async_checker());
+    auto f1 = async_yielder();
+    auto f2 = async_checker();
+    async::gather(f1, f2);
   });
 
   TEST_ASSERT(has_yielded, "Test hasn't yielded");
@@ -172,7 +186,7 @@ async_task_n(async_wait, "waiter") {
 
 async_task(async_notify) {
   TEST_ASSERT(!waiter_finished, "Task shouldn't be finished before being woken");
-  TEST_ASSERT(async::getGlobalLoop()->getTask("waiter")->getState() == async::Task::State::WAIT, "Waiter task should be waiting");
+  TEST_ASSERT_EQ(async::getGlobalLoop()->getTask("waiter")->getState(), async::Task::State::WAIT, "Waiter task should be waiting");
   async::notify(async::getGlobalLoop()->getTask("waiter")->getId());
 }
 
@@ -181,10 +195,9 @@ TEST(async_tests, async_wait_notify, "Async wait/notify test") {
 
   try {
     async::run([] {
-      async::gather(
-        async_wait(),
-        async_notify()
-      );
+      auto f1 = async_wait();
+      auto f2 = async_notify();
+      async::gather(f1, f2);
     });
 
     TEST_ASSERT(waiter_finished, "Task didn't finish");
