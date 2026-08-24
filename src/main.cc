@@ -1,5 +1,4 @@
 #include <test.h>
-#include <signal.h>
 
 auto async_tests = test::TestSuite("async");
 
