@@ -58,7 +58,7 @@ TEST(async_tests, async_future_await_failed, "Async future .await() failed to co
     });
 
     TEST_ASSERT(false, "Future should not be completed");
-  } catch (async::FutureFailedToCompleteException) {}
+  } catch (async::FutureFailedToCompleteException&) {}
 
   async::getGlobalLoop()->clear();
 }

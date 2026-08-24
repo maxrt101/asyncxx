@@ -23,7 +23,6 @@ async_task(async_event_notifier, std::shared_ptr<async::Event> ev) {
 TEST(async_tests, async_event, "Async event wait/notifyOne test") {
   unlocked_through_event = false;
 
-
   try {
     async::run([] {
       auto ev = async::Event::create();
@@ -74,7 +73,7 @@ TEST(async_tests, async_event_multi, "Async event wait/notifyAll test") {
 
     TEST_ASSERT(unlocked_through_event1, "Task 1 didn't finish");
     TEST_ASSERT(unlocked_through_event1, "Task 2 didn't finish");
-  } catch (test::AssertionError e) {
+  } catch (test::AssertionError&) {
     async::getGlobalLoop()->clear();
     throw;
   }
@@ -107,7 +106,7 @@ TEST(async_tests, async_event_ensure, "Async event wait/ensureNotifyOne test") {
     });
 
     TEST_ASSERT(unlocked_through_event, "Task didn't finish");
-  } catch (test::AssertionError e) {
+  } catch (test::AssertionError&) {
     async::getGlobalLoop()->clear();
     throw;
   }
