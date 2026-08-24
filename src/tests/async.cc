@@ -201,7 +201,7 @@ TEST(async_tests, async_wait_notify, "Async wait/notify test") {
     });
 
     TEST_ASSERT(waiter_finished, "Task didn't finish");
-  } catch (test::AssertionError e) {
+  } catch (test::AssertionError&) {
     async::getGlobalLoop()->clear();
     throw;
   }
