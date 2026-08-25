@@ -74,16 +74,16 @@ void gather(Futures&&... futures) {
 
 
 template <typename T, typename F, typename... Args>
-std::shared_ptr<Future<T>> task(F fn, Args... args) {
+std::shared_ptr<Future<T>> task(F fn, Args&&... args) {
   auto f = std::make_shared<Future<T>>();
   auto loop = getGlobalLoop();
 
-  loop->addThreadedTask([f, fn, args...]() mutable {
+  loop->addThreadedTask([f, fn, ...args = std::forward<Args>(args)]() mutable {
     if constexpr (std::is_void_v<T>) {
-      fn(args...);
+      fn(std::move(args)...);
       f->complete();
     } else {
-      f->complete(fn(args...));
+      f->complete(fn(std::move(args)...));
     }
   });
 
@@ -100,7 +100,7 @@ inline void run(const Task::Worker& fn) {
 }
 
 
-template <typename T = void, typename... Args>
+template <typename T, typename... Args>
 T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args) {
   const auto loop = getGlobalLoop();
 
