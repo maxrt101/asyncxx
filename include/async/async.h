@@ -99,4 +99,22 @@ inline void run(const Task::Worker& fn) {
   loop->clear();
 }
 
+
+template <typename T = void, typename... Args>
+T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args) {
+  const auto loop = getGlobalLoop();
+
+  std::shared_ptr<Future<T>> f;
+
+  loop->addTask([&f, task, ...args = std::forward<Args>(args)] {
+    f = task(std::move(args)...);
+    f->await();
+  }, "<run>");
+
+  loop->runUntilCompleted();
+  loop->clear();
+
+  return f->get();
+}
+
 }
