@@ -175,11 +175,11 @@ public:
     this->execute(pipes);
 
     return {
-      async::task<ResultRef>([this, pipes] {
+      .future = async::task<ResultRef>([this, pipes] {
         this->wait(pipes);
         return this->result;
       }),
-      result->io
+      .io = result->io
     };
   }
 
