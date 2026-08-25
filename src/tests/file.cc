@@ -62,7 +62,6 @@ TEST(async_tests, async_io_file_read, "Read 4 chars from file asynchronously") {
 }
 
 
-
 TEST(async_tests, async_io_file_read_all, "Read file asynchronously") {
   auto _ = FileTestContext::string();
 

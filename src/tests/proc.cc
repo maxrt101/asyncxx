@@ -31,6 +31,7 @@ TEST(async_tests, async_proc, "Async process runner test") {
 TEST(async_tests, async_proc_invalid, "Async process non-existent command test") {
   bool ok = false;
   int code = -1;
+
   async::run([&] {
     const auto proc = async::io::Process::create("abcdef");
     const auto res = proc->await();

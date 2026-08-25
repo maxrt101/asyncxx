@@ -44,7 +44,7 @@ async_task(async_task_fn) {
 TEST(async_tests, async_fn, "Async task function test") {
   has_async_task_ran = false;
 
-  async::run([] { async_task_fn(); });
+  async::run(async_task_fn);
 
   TEST_ASSERT(has_async_task_ran, "Test function didn't run");
 }
@@ -57,7 +57,7 @@ async_task_r(async_task_ret_fn, int) {
 TEST(async_tests, async_fn_ret, "Async task function that returns test") {
   int res = 0;
 
-  async::run([&res] { res = async_task_ret_fn()->await(); });
+  res = async::run<int>(async_task_ret_fn);
 
   TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
@@ -70,7 +70,7 @@ async_task(async_task_arg_fn, int a) {
 TEST(async_tests, async_fn_arg, "Async task function that has args test") {
   async_result = 0;
 
-  async::run([] { async_task_arg_fn(42)->await(); });
+  async::run<void>(async_task_arg_fn, 42);
 
   TEST_ASSERT_EQ(async_result, 42, "Test function didn't run");
 }
@@ -83,7 +83,7 @@ async_task_r(async_task_arg_ret_fn, int, int a) {
 TEST(async_tests, async_fn_arg_ret, "Async task function that has args and returns test") {
   int res = 0;
 
-  async::run([&res] { res = async_task_arg_ret_fn(42)->await(); });
+  res = async::run<int>(async_task_arg_ret_fn, 42);
 
   TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
@@ -92,7 +92,7 @@ TEST(async_tests, async_fn_arg_ret, "Async task function that has args and retur
 TEST(async_tests, async_await_void, "Async task await test (void)") {
   has_async_task_ran = false;
 
-  async::run([] { async_task_fn()->await(); });
+  async::run(async_task_fn);
 
   TEST_ASSERT(has_async_task_ran, "Test function didn't run");
 }
@@ -101,7 +101,7 @@ TEST(async_tests, async_await_void, "Async task await test (void)") {
 TEST(async_tests, async_await_val, "Async task await test (value)") {
   int res = 0;
 
-  async::run([&res] { res = async_task_ret_fn()->await(); });
+  res = async::run<int>(async_task_ret_fn);
 
   TEST_ASSERT_EQ(res, 42, "Test function didn't run");
 }
