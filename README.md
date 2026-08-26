@@ -5,7 +5,7 @@ asyncxx is a header-only library for asynchronous programming in C++. It is heav
 Features:  
  - Full async task backend based on setjmp and some black magic  
  - Futures (can be used stand-alone or incorporated into your functions)  
- - Events (spin lock without the spinning)  
+ - Events (kind of like a mutex)  
  - Built-in thread pool for resource-heavy tasks to be offloaded from main thread  
  - Asynchronous File class  
  - Asynchronous Process class (with dynamic IO)  
