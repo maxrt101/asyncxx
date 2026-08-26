@@ -183,8 +183,10 @@ TEST(async_tests, async_proc_kill, "Async process kill test") {
   TEST_ASSERT_EQ(err, "", "Process stderr should be empty");
 }
 
+#define INTER_PROCESS_MESSAGE "Hello from process!"
+
 static int process_worker() {
-  printf("Hello from process!");
+  printf(INTER_PROCESS_MESSAGE);
   fflush(stdout);
   return 42;
 }
@@ -206,6 +208,8 @@ TEST(async_tests, async_proc_fn, "Async process running a fuction") {
 
   TEST_ASSERT(ok, "Process should run successfully");
   TEST_ASSERT_EQ(code, 42, "Process exit code should be 42");
-  TEST_ASSERT_EQ(out, "Hello from process!", "Process stdout should not be empty");
+  // On linux stdout buffer is forked as well, leading to a
+  // possibility when test output is printed in child process
+  TEST_ASSERT(out.contains(INTER_PROCESS_MESSAGE), "Process stdout should not be empty");
   TEST_ASSERT_EQ(err, "", "Process stderr should be empty");
 }
