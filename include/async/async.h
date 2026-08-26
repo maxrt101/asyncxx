@@ -42,7 +42,7 @@ inline EventLoop * getGlobalLoop() {
 }
 
 /**
- * @brief Exists from an async task
+ * @brief Exits from an async task
  *
  * @warning Works only in async context
  */

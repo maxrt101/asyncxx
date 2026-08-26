@@ -168,6 +168,7 @@ public:
       task->stack.id = VALGRIND_STACK_REGISTER(task->stack.data, task->stack.data + task->stack.size);
 #endif
 
+      // TODO: Make aligment configurable (per platform)
       uintptr_t stack_top = reinterpret_cast<uintptr_t>(task->stack.data + task->stack.size);
       stack_top = (stack_top & ~0xFL) - 256;
       platform::set_stack(reinterpret_cast<void*>(stack_top));

@@ -7,6 +7,7 @@
 
 /**
  * @brief Default task stack size (redefinable)
+ * TODO: Set per-platform?
  */
 #ifndef ASYNC_TASK_DEFAULT_STACK_SIZE
 #define ASYNC_TASK_DEFAULT_STACK_SIZE 65536
