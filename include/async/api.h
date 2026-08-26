@@ -24,7 +24,10 @@ inline Task * self();
 template <typename... Futures>
 void gather(Futures&&... futures);
 
-template <typename T = void, typename F, typename... Args>
+template <typename F, typename... Args, typename T = std::invoke_result_t<F, Args...>>
+std::shared_ptr<Future<T>> task(F fn, Args&&... args);
+
+template <typename F, typename... Args, typename T = std::invoke_result_t<F, Args...>>
 std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args);
 
 template <typename T = void, typename... Args>

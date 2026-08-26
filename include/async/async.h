@@ -124,6 +124,33 @@ void gather(Futures&&... futures) {
 }
 
 /**
+ * @brief Create an async task from a lambda
+ *
+ * @tparam F    Lambda type
+ * @tparam Args Lambda argument types
+ * @tparam T    Return type (inferred from `F` and placed into the result Future)
+ * @param  fn   Task worker lambda
+ * @param  args Task worker lambda arguments
+ * @return Future, that when awaited will call `fn`
+ */
+template <typename F, typename... Args, typename T>
+std::shared_ptr<Future<T>> task(F fn, Args&&... args) {
+  auto f = std::make_shared<Future<T>>();
+  auto loop = getGlobalLoop();
+
+  loop->addTask([f, fn, ...args = std::forward<Args>(args)] mutable {
+    if constexpr (std::is_void_v<T>) {
+      fn(std::move(args)...);
+      f->complete();
+    } else {
+      f->complete(fn(std::move(args)...));
+    }
+  });
+
+  return f;
+}
+
+/**
  * @brief Offload a task to a different thread using ThreadPool managed by
  *        global EventLoop. Task is any function, accepting any arguments,
  *        returning any value, that is wrapped in a lambda and pushed into
@@ -132,11 +159,11 @@ void gather(Futures&&... futures) {
  * @tparam T    Task return type
  * @tparam F    Task function type
  * @tparam Args Task argument types
- * @param fn   Task function
- * @param args Task argument
+ * @param  fn   Task function
+ * @param  args Task argument
  * @return Task result
  */
-template <typename T, typename F, typename... Args>
+template <typename F, typename... Args, typename T>
 std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args) {
   auto f = std::make_shared<Future<T>>();
   auto loop = getGlobalLoop();
@@ -188,6 +215,8 @@ inline void run(const Task::Worker& fn) {
  *
  *   async::run(write_file);
  * @endcode
+ *
+ * TODO: Use `typename F` to accept any function/lambda?
  *
  * @tparam T    Async function return type
  * @tparam Args Async function argument types

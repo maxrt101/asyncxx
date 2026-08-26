@@ -248,7 +248,7 @@ public:
     this->execute(pipes);
 
     return {
-      .future = async::to_thread<ResultRef>([this, pipes] {
+      .future = async::to_thread([this, pipes] {
         this->wait(pipes);
         return this->result;
       }),
@@ -269,7 +269,7 @@ public:
 
     state = State::INIT;
 
-    return async::to_thread<ResultRef>([this] {
+    return async::to_thread([this] {
       const auto pipes = Pipes::create(input);
 
       this->execute(pipes);

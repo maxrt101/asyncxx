@@ -227,7 +227,7 @@ public:
   std::shared_ptr<Future<std::string>> readLine() const {
     assertThrow(handle, FileNotOpenedException());
 
-    return async::to_thread<std::string>([this] {
+    return async::to_thread([this] {
       std::string buf;
 
       while (true) {
@@ -301,7 +301,7 @@ private:
    */
   template <typename T>
   std::shared_ptr<Future<T>> readInner(const size_t n, bool check) const {
-    return async::to_thread<T>([this, n, check] {
+    return async::to_thread([this, n, check] -> T {
       if (n == 0) return T {};
 
       T buf;
@@ -326,7 +326,7 @@ private:
    */
   template <typename T>
   std::shared_ptr<Future<T>> readInnerBuffered() const {
-    return async::to_thread<T>([this] {
+    return async::to_thread([this] -> T {
       T result;
 
       while (true) {
