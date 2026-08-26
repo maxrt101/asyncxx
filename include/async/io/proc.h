@@ -294,25 +294,26 @@ public:
 
   /**
    * @brief Chain output from `proc1` as an input for `proc1`
-   *
-   * @warning Implicitly awaits `proc1` and it's output
-   * @warning Doesn't abort if `proc1` fails
-   * @todo Create a task? Which when awaited will do the work, aborting
-   *       if proc1 fails
-   *
+
    * @param proc1 Process, output of which will be passed to `proc2`
    * @param proc2 Process, which receives output of `proc1`
-   * @return Future for `proc2`
+   * @return Future that will return result for `proc2` of success and for `proc1` on it's failure
    */
   static ResultFuture chain(
     const std::shared_ptr<Process>& proc1,
     const std::shared_ptr<Process>& proc2
   ) {
-    const auto r = proc1->await();
-  
-    proc2->input = r->io->out->readAll()->await();
-  
-    return proc2->run();
+    return async::task([&] {
+      auto r = proc1->await();
+
+      if (!r->ok || !r->exit_code) {
+        return r;
+      }
+
+      proc2->input = r->io->out->readAll()->await();
+
+      return proc2->await();
+    });
   }
 
   /** @brief Shortcut for run().await() */
