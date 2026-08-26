@@ -30,10 +30,15 @@ struct ProcessNotRunningException final : std::runtime_error {
  *  - dynamically pushing into stdin
  *  - chaining output of one process into another
  *
+ * Process can run an arbitrary command (passed as a string, or already split list)
+ * or a user-provided runner function
+ *
  * Wraps around unix system calls: fork, execvp, kill, pipe, dup2, fcntl, read, write, close
  */
 class Process {
 public:
+  using FunctionType = std::function<int()>;
+
   /**
    * @brief Exposes stdout/stderr/stdin as async File instances wrapped around piped fd
    */
@@ -190,10 +195,89 @@ private:
 
   using PipesRef = std::shared_ptr<Pipes>;
 
+  /**
+   * @brief Base class for an Execution Target
+   *
+   * Execution Target represents what to execute in a spawned process
+   */
+  struct ExecutionTarget {
+    enum Type {
+      COMMAND,
+      FUNCTION,
+    };
+
+    Type type;
+
+    ExecutionTarget(Type type) : type(type) {}
+    virtual ~ExecutionTarget() {}
+
+    /**
+     * @brief Ran after `fork()` in child process
+     */
+    virtual void execute(PipesRef pipes) = 0;
+  };
+
+  /**
+   * @brief Command Execution Target - executes a shell command (runs an executable)
+   */
+  struct CommandTarget : ExecutionTarget {
+    std::vector<std::string> args;
+
+    CommandTarget(const std::vector<std::string>& args)
+      : ExecutionTarget(COMMAND), args(args) {}
+
+    /**
+     * @brief Creates an argv and passes it to execvp. Has safeguards if execvp fails
+     */
+    void execute(PipesRef pipes) override {
+      // It's ok to not free argv buffer, since execvp will perform
+      // typical cleanup for current process before loading new process
+      const auto argv = createArgv();
+      execvp(argv[0], argv);
+
+      // Will only reach here if execvp fails
+      // If reached, will put a special marker into service pipe
+      // to let the parent process know that execvp failed
+      write(pipes->service[1], "1", 1);
+
+      _exit(-1);
+    }
+
+    /** @brief Simple helper to create a typical argv from args */
+    char ** createArgv() const {
+      const auto argv = new char*[args.size()+1];
+
+      for (size_t i = 0; i < args.size(); i++) {
+        argv[i] = strdup(args[i].c_str());
+      }
+
+      argv[args.size()] = nullptr;
+
+      return argv;
+    }
+  };
+
+  /**
+   * @brief Function Execution Target - runs a user-provided function
+   */
+  struct FunctionTarget : ExecutionTarget {
+    FunctionType worker;
+
+    FunctionTarget(FunctionType worker)
+      : ExecutionTarget(FUNCTION), worker(std::move(worker)) {}
+
+    /**
+     * @brief Runs user function, which must return an int, which is then used as a result code
+     */
+    void execute(PipesRef pipes) override {
+      _exit(worker());
+    }
+  };
+
   State       state;
   pid_t       pid;
   std::mutex  mutex;
-  std::string command;
+  std::shared_ptr<ExecutionTarget> target; // TODO: unique_ptr?
   std::string input;
   ResultRef   result;
 
@@ -203,32 +287,58 @@ public:
       pid(0),
       result(std::make_shared<Result>()) {}
 
-  explicit Process(const std::string& command)
-    : state(State::NONE),
-      pid(0),
-      command(command),
-      result(std::make_shared<Result>()) {}
+  /**
+   * @brief Create a process instance with an already split vector of
+   *        individual arguments + optional input for stdin
+   */
+  explicit Process(const std::vector<std::string>& args, const std::string& input = "") : Process()
+  {
+    this->target = std::make_shared<CommandTarget>(args);
+    this->input = input;
+  }
 
-  Process(const std::string& command, const std::string& input)
-    : state(State::NONE),
-      pid(0),
-      command(command),
-      input(input),
-      result(std::make_shared<Result>()) {}
+  /**
+   * @brief Create a process instance with a command string, which will get
+   *        split (with quotes taken into account) + optional input for stdin
+   */
+  explicit Process(const std::string& command, const std::string& input = "")
+    : Process(str::splitQuoted(command), input) {}
 
-  // TODO: A constructor(s) which receives command as a vector (already split)
-  // TODO: A way to run a user function in spawned process
+  /**
+   * @brief Create a process instance with a user-provided function, that will
+   *        run in child process + optional input for stdin
+   */
+  Process(FunctionType fn, const std::string& input = "") : Process() {
+    this->target = std::make_shared<FunctionTarget>(fn);
+    this->input = input;
+  }
 
   ~Process() {}
 
+  static std::shared_ptr<Process> create(const std::vector<std::string>& args, const std::string& input = "") {
+    return std::make_shared<Process>(args, input);
+  }
+
   static std::shared_ptr<Process> create(const std::string& command, const std::string& input = "") {
     return std::make_shared<Process>(command, input);
+  }
+
+  static std::shared_ptr<Process> create(FunctionType fn, const std::string& input = "") {
+    return std::make_shared<Process>(fn, input);
   }
 
   bool isRunning() {
     auto lock = std::unique_lock(mutex);
 
     return state == State::EXEC;
+  }
+
+  bool isCommand() const {
+    return target->type == ExecutionTarget::COMMAND;
+  }
+
+  bool isFunction() const {
+    return target->type == ExecutionTarget::FUNCTION;
   }
 
   /**
@@ -294,7 +404,7 @@ public:
 
   /**
    * @brief Chain output from `proc1` as an input for `proc1`
-
+   *
    * @param proc1 Process, output of which will be passed to `proc2`
    * @param proc2 Process, which receives output of `proc1`
    * @return Future that will return result for `proc2` of success and for `proc1` on it's failure
@@ -336,16 +446,10 @@ private:
     if (pid == 0) {
       pipes->prepareChild();
 
-      // It's ok to not free argv buffer, since execvp will perform
-      // typical cleanup for current process before loading new process
-      const auto argv = createArgv();
-      execvp(argv[0], argv);
+      // Run target-specific executor
+      target->execute(pipes);
 
-      // Will only reach here if execvp fails
-      // If reached, will put a special marker into service pipe
-      // to let the parent process know that execvp failed
-      write(pipes->service[1], "1", 1);
-
+      // Last resort :)
       _exit(-1);
     }
 
@@ -395,20 +499,6 @@ private:
     if (WIFEXITED(status)) {
       result->exit_code = WEXITSTATUS(status);
     }
-  }
-
-  /** @brief Simple helper to split the command & create a typical argv from it */
-  char ** createArgv() const {
-    const auto args = str::splitQuoted(command);
-    const auto argv = new char*[args.size()+1];
-
-    for (size_t i = 0; i < args.size(); i++) {
-      argv[i] = strdup(args[i].c_str());
-    }
-
-    argv[args.size()] = nullptr;
-
-    return argv;
   }
 };
 
