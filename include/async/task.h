@@ -5,26 +5,36 @@
 #include <cstdint>
 #include <csetjmp>
 
+/**
+ * @brief Default task stack size (redefinable)
+ */
 #ifndef ASYNC_TASK_DEFAULT_STACK_SIZE
 #define ASYNC_TASK_DEFAULT_STACK_SIZE 65536
 #endif
 
 namespace async {
 
+/** @brief Alias for task ID */
 using TaskId = int64_t;
 
+/** @brief Invalid Task ID */
 constexpr TaskId INVALID_TASK_ID = -1UL;
 
+/**
+ * @brief Task Control Block (or Task Context) for an asynchronous task
+ */
 class Task {
 public:
+  /** @brief Task State */
   enum class State {
-    NONE = 0,
-    INIT = 1,
-    EXEC = 2,
-    WAIT = 3,
-    DONE = 4,
+    NONE = 0, /// Uninitialized
+    INIT = 1, /// Initialized, waits for startup
+    EXEC = 2, /// Executing/Ready for execution
+    WAIT = 3, /// Waiting for wakeup
+    DONE = 4, /// Finished
   };
 
+  /** @brief Task worker function type */
   using Worker = std::function<void()>;
 
 private:

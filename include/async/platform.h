@@ -1,3 +1,6 @@
+/**
+ * @brief Decides on including platform-specific stuff
+ */
 #pragma once
 
 #if __x86_64__

@@ -5,7 +5,18 @@
 
 namespace async {
 
+/**
+ * @brief Event task synchronization primitive
+ *
+ * Event can be waited on, or notified by.
+ * If an event is waited on - the task saved it's ID into the event &
+ * calls `async::wait()`, which transitions it into the WAIT state,
+ * suspending it's execution, until it is unblocked (event posted).
+ * If an event is notified by - one task calls `notify*()`, which
+ * call `async::notify()` on each appropriate task (first one or all).
+ */
 class Event {
+  /** @brief Mutex-guarded list of tasks, that are waiting on this event */
   struct {
     std::vector<TaskId> list;
     std::mutex          mutex;
@@ -15,10 +26,16 @@ public:
   Event() = default;
   ~Event() = default;
 
+  /** @brief Shortcut to a make_shared<Event> */
   static std::shared_ptr<Event> create() {
     return std::make_shared<Event>();
   }
 
+  /**
+   * @brief Notifies first task from a list
+   *
+   * @returns @c true if a task was waken, @c false otherwise
+   */
   bool notifyOne() {
     auto lock = std::unique_lock(waiters.mutex);
 
@@ -34,6 +51,7 @@ public:
     return true;
   }
 
+  /** @brief Notifies all waiting tasks */
   void notifyAll() {
     auto lock = std::unique_lock(waiters.mutex);
 
@@ -44,11 +62,14 @@ public:
     waiters.list.clear();
   }
 
+  /** @brief Wait on this event */
   void wait() {
     saveWaiter();
     async::wait();
   }
 
+  /** @brief Guarantees that one task is woken. Does this by calling
+   *         `notifyOne()` in a loop while yielding on each pass */
   void ensureNotifyOne() {
     while (!notifyOne()) {
       yield();
@@ -56,6 +77,7 @@ public:
   }
 
 private:
+  /** @brief Saves current task ID into waiters list */
   void saveWaiter() {
     auto lock = std::unique_lock(waiters.mutex);
 

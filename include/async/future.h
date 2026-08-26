@@ -15,19 +15,32 @@ struct FutureFailedToCompleteException final : std::runtime_error {
   FutureFailedToCompleteException() : std::runtime_error("Future failed to complete") {}
 };
 
+/**
+ * @brief Represents a result of as asynchronous task, which is yet to be
+ *        computed. Future can also represent a computation, which produces
+ *        no result, then it's just a marker for the end of that computation.
+ *        Future can also be waited on, than task(s) which wait for it are
+ *        blocked, until the computation yields a result.
+ *
+ * @tparam T Computation result type
+ */
 template <typename T = void>
 class Future {
   struct Empty {};
 
+  /** @brief Alias for computation result, resolved to `Empty` if T=void */
   using Result = std::conditional_t<std::is_void_v<T>, Empty, T>;
 
+  /** @brief Atomic flag which signifies the computation completion */
   std::atomic<bool> completed;
 
+  /** @brief List of those who wait for this future to finish */
   struct {
     std::vector<TaskId> list;
     std::mutex          mutex;
   } waiters;
 
+  /** @brief Stores the result of the computation */
   Result result;
 
 public:
@@ -36,6 +49,7 @@ public:
       waiters(),
       result() {}
 
+  /** @brief Shortcut for a make_shared<Future> */
   static std::shared_ptr<Future> create() {
     return std::make_shared<Future>();
   }
@@ -44,6 +58,7 @@ public:
     return completed.load();
   }
 
+  /** @brief Returns result, if T!=void, if future is completed, otherwise throws*/
   auto get() {
     if (!is_completed()) throw FutureNotReadyException();
 
@@ -52,6 +67,7 @@ public:
     }
   }
 
+  /** @brief Completes the future, saving the result and notifying waiters */
   template<typename U = T>
   void complete(std::enable_if_t<!std::is_void_v<U>, U> val) {
     result = val;
@@ -59,12 +75,14 @@ public:
     notifyAll();
   }
 
+  /** @brief Completes the future, notifying waiters */
   void complete() {
     static_assert(std::is_void_v<T>, "complete() without args is only for Future<void>");
     completed.store(true);
     notifyAll();
   }
 
+  /** @brief Blocks caller task until the future is completed */
   auto await() {
     if (is_completed()) {
       return get();
@@ -81,12 +99,14 @@ public:
   }
 
 private:
+  /** @brief Saves current task ID into waiters list */
   void saveWaiter() {
     auto lock = std::unique_lock(waiters.mutex);
 
     waiters.list.push_back(self()->getId());
   }
 
+  /** @brief Notifies all waiting tasks */
   void notifyAll() {
     auto lock = std::unique_lock(waiters.mutex);
 

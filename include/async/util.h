@@ -7,7 +7,7 @@
 namespace async {
 
 /**
- * Helper function to throw a specific exception if expr is false
+ * @brief Helper function to throw a specific exception if expr is false
  *
  * @tparam E Exception type. Usually inferred by the compiler from `ex`
  * @param expr true - OK, false - will throw
@@ -21,7 +21,7 @@ void assertThrow(bool expr, const E& ex) {
 }
 
 /**
- * Helper function to throw a specific exception if expr is NULL
+ * @brief Helper function to throw a specific exception if expr is NULL
  *
  * @tparam T Type of expr. Usually inferred by the compiler from `expr`
  * @tparam E Exception type. Usually inferred by the compiler from `ex`
@@ -38,7 +38,7 @@ T throwIfNull(T expr, const E& ex) {
   return expr;
 }
 
-/* Checks of value is in any of args */
+/** @brief Checks of value is in any of args */
 template <typename T, typename... Args>
 bool oneOf(T&& value, Args&&... args) {
   return ((value == args) || ...);
@@ -46,6 +46,13 @@ bool oneOf(T&& value, Args&&... args) {
 
 namespace str {
 
+/**
+ * @brief Splits `str` into an array of string by `delimiter`
+ *
+ * @param str       String to split
+ * @param delimiter Delimiter to split `str` by (by default - space)
+ * @return A vector of tokens
+ */
 inline std::vector<std::string> split(const std::string& str, const std::string& delimiter = " ") {
   std::vector<std::string> result;
   size_t last = 0, next = 0;
@@ -59,6 +66,14 @@ inline std::vector<std::string> split(const std::string& str, const std::string&
   return result;
 }
 
+/**
+ * @brief Splits `str` into an array of string by `delimiter`, taking quotes
+ *        (double & single) into account.
+ *
+ * @param str       String to split
+ * @param delimiter Delimiter to split `str` by (by default - space)
+ * @return A vector of tokens
+ */
 inline std::vector<std::string> splitQuoted(const std::string& str, const char delimiter = ' ') {
   std::vector<std::string> result;
   std::string current;
@@ -97,7 +112,21 @@ inline std::vector<std::string> splitQuoted(const std::string& str, const char d
   return result;
 }
 
-
+/**
+ * @brief Escapes certain sequences from a string, such as:
+ *        - new line
+ *        - caret return
+ *        - tab
+ *        - single/double quotes
+ *        - non-printable characters
+ *        Escaped string has characters listed above replaced with "\C", where
+ *        C is the character. Non-printable characters are escaped as "\xAA",
+ *        where AA is the char byte.
+ *        Assumes ascii encoding
+ *
+ * @param str String to escape
+ * @return Escaped string
+ */
 inline std::string escape(const std::string& str) {
   std::string out;
   out.reserve(str.size());

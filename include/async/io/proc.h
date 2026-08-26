@@ -1,9 +1,9 @@
 #pragma once
 
+#include <csignal>
+#include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
-#include <signal.h>
-#include <string.h>
 #include <sys/wait.h>
 
 #include <async/util.h>
@@ -13,13 +13,30 @@
 
 namespace async::io {
 
+/** @brief Process's supposed to be running, but it's not */
 struct ProcessNotRunningException final : std::runtime_error {
   explicit ProcessNotRunningException()
     : std::runtime_error("Process has to be started to perform this action") {}
 };
 
+/**
+ * @brief Asynchronous Process Class
+ *
+ * Allows for process manipulation, exposing operations such as:
+ *  - start
+ *  - terminate
+ *  - send signal
+ *  - retrieving stdout & stderr
+ *  - dynamically pushing into stdin
+ *  - chaining output of one process into another
+ *
+ * Wraps around unix system calls: fork, execvp, kill, pipe, dup2, fcntl, read, write, close
+ */
 class Process {
 public:
+  /**
+   * @brief Exposes stdout/stderr/stdin as async File instances wrapped around piped fd
+   */
   struct IO {
     std::shared_ptr<File> in  = std::make_shared<File>();
     std::shared_ptr<File> out = std::make_shared<File>();
@@ -28,17 +45,30 @@ public:
 
   using IORef = std::shared_ptr<IO>;
 
+  /**
+   * @brief Process run result
+   *
+   * `exit_code` - int return code from process itself
+   * `ok`        - flag that shows if the desired process had started at all
+   */
   struct Result {
     bool ok = false;
 
     int exit_code = 0;
 
-    std::shared_ptr<IO> io = std::make_shared<IO>();
+    IORef io = std::make_shared<IO>();
   };
 
   using ResultRef    = std::shared_ptr<Result>;
   using ResultFuture = std::shared_ptr<Future<ResultRef>>;
 
+  /**
+   * @brief Compound result of Process::start()
+   *
+   * Needed to return both the future (for user to have somthing to await for)
+   * and reference to IO struct, for IO manipulation to read/write stdin/stdout
+   * while the process is running
+   */
   struct Started {
     ResultFuture future;
     IORef        io;
@@ -46,12 +76,19 @@ public:
 
 private:
   enum class State {
-    NONE,
-    INIT,
-    EXEC,
-    DONE,
+    NONE, /// Uninitialized (0)
+    INIT, /// Initialization in progress
+    EXEC, /// Executing the process
+    DONE, /// Process finished (exited or crashed)
   };
 
+  /**
+   * @brief Helper struct for managing IPC between parent & child processes
+   *
+   * Contains duped file descriptors for stdin, stdout, stderr, and a special
+   * service fd. Service fd is used to communicate about a failure of `execvp`
+   * by writing a special marker for parent process to read
+   */
   struct Pipes {
     int in[2]      = {-1, -1};
     int out[2]     = {-1, -1};
@@ -60,6 +97,15 @@ private:
 
     const std::string& input;
 
+    /**
+     * @brief Create pipes for stdin, stdout, stderr & service
+     *
+     * Service gets special treatment, by being a NONBLOCK pipe, because
+     * normally, child process shouldn't write to it at all, so parent
+     * shouldn't block on it
+     *
+     * @param input If the input for stdin is known beforehand, it is saved here
+     */
     explicit Pipes(const std::string& input) : input(input) {
       pipe(out);
       pipe(err);
@@ -69,6 +115,7 @@ private:
       fcntl(service[0], F_SETFL, fcntl(service[0], F_GETFL) | O_NONBLOCK);
     }
 
+    /** @brief Close all pipes (if opened) */
     ~Pipes() {
       for (auto& p : {in, out, err, service}) {
         close_fd(p[0]);
@@ -76,10 +123,12 @@ private:
       }
     }
 
+    /** @brief Shortcut for make_shared<Pipes> */
     static std::shared_ptr<Pipes> create(const std::string& input) {
       return std::make_shared<Pipes>(input);
     }
 
+    /** @brief Close an fd, if it's not closed already */
     static void close_fd(int& fd) {
       if (fd >= 0) {
         ::close(fd);
@@ -87,6 +136,8 @@ private:
       }
     }
 
+    /** @brief Called by the child to dup pipes into stdin/stdout/stderr and
+     *         close unused ends */
     void prepareChild() {
       dup2(out[1], STDOUT_FILENO);
       dup2(err[1], STDERR_FILENO);
@@ -95,6 +146,8 @@ private:
       closeFromChild();
     }
 
+    /** @brief Closes unused (by the parent) pipe ends and write input
+     *         (if present) into stdin */
     void prepareParent() {
       close_fd(out[1]);
       close_fd(err[1]);
@@ -106,6 +159,14 @@ private:
       }
     }
 
+    /**
+     * @brief Returns @c true if a special marker was sent by the child
+     *
+     * The marker indicates that the execvp failed to execute
+     *
+     * @warning A one-time operation; reading from service pipe clears
+     *          it out, so next calls will allways return @c false
+     */
     bool hadMarker() const {
       uint8_t marker = 0;
 
@@ -116,6 +177,7 @@ private:
       return false;
     }
 
+    /** @brief Closes unused (by the child) ends of pipes */
     void closeFromChild() {
       for (auto& p : {in, out, err}) {
         close_fd(p[0]);
@@ -166,6 +228,14 @@ public:
     return state == State::EXEC;
   }
 
+  /**
+   * @brief Starts the process, returning the awaitable future and a IORef
+   *        Call this when stdin/stdout/stderr must by manipulated while
+   *        the process runs
+   *
+   * @return Awaitable future (.await() will call waitpid) and IORef for
+   *         stdin/stdout/stderr manipulation
+   */
   Started start() {
     auto lock = std::unique_lock(mutex);
 
@@ -183,6 +253,14 @@ public:
     };
   }
 
+  /**
+   * @brief Starts the process, returning an awaitable future
+   *        Call this, when stdin/stdout/stderr isn't needed to be
+   *        manipulated while the process runs (you're only interested
+   *        in the output after it finishes)
+   *
+   * @return Awaitable future (.await() will call waitpid)
+   */
   ResultFuture run() {
     auto lock = std::unique_lock(mutex);
 
@@ -198,6 +276,11 @@ public:
     });
   }
 
+  /**
+   * @brief Send a signal to this process
+   *
+   * @param sig Any POSIX signal (SIGKILL by default)
+   */
   void kill(const int sig = SIGKILL) {
     assertThrow(state == State::EXEC, ProcessNotRunningException());
 
@@ -206,6 +289,18 @@ public:
     ::kill(pid, sig);
   }
 
+  /**
+   * @brief Chain output from `proc1` as an input for `proc1`
+   *
+   * @warning Implicitly awaits `proc1` and it's output
+   * @warning Doesn't abort if `proc1` fails
+   * @todo Create a task? Which when awaited will do the work, aborting
+   *       if proc1 fails
+   *
+   * @param proc1 Process, output of which will be passed to `proc2`
+   * @param proc2 Process, which receives output of `proc1`
+   * @return Future for `proc2`
+   */
   static ResultFuture chain(
     const std::shared_ptr<Process>& proc1,
     const std::shared_ptr<Process>& proc2
@@ -217,20 +312,34 @@ public:
     return proc2->run();
   }
 
+  /** @brief Shortcut for run().await() */
   ResultRef await() {
     return run()->await();
   }
 
 private:
+  /**
+   * @brief Actual runner/executor of new process
+   *
+   * Will fork current process, running desired command in the child
+   * and preparing IO and closing pipes in the parent
+   *
+   * @param pipes Valid/initialized Pipes reference
+   */
   void execute(PipesRef pipes) {
     pid = fork();
 
     if (pid == 0) {
       pipes->prepareChild();
 
+      // It's ok to not free argv buffer, since execvp will perform
+      // typical cleanup for current process before loading new process
       const auto argv = createArgv();
       execvp(argv[0], argv);
 
+      // Will only reach here if execvp fails
+      // If reached, will put a special marker into service pipe
+      // to let the parent process know that execvp failed
       write(pipes->service[1], "1", 1);
 
       _exit(-1);
@@ -261,6 +370,11 @@ private:
     state = State::EXEC;
   }
 
+  /**
+   * @brief Used by the process result future, to wait for the process to finish
+   *
+   * @param pipes Valid/Initialized pipes reference
+   */
   void wait(PipesRef pipes) {
     int status = 0;
 
@@ -279,6 +393,7 @@ private:
     }
   }
 
+  /** @brief Simple helper to split the command & create a typical argv from it */
   char ** createArgv() const {
     const auto args = str::splitQuoted(command);
     const auto argv = new char*[args.size()+1];

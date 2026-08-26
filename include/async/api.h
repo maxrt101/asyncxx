@@ -1,3 +1,7 @@
+/**
+ * @brief Provides forward declarations to basic async APIs to avoid circular
+ *        includes with async.h
+ */
 #pragma once
 
 #include <async/task.h>

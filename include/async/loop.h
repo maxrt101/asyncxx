@@ -10,28 +10,54 @@
 
 namespace async {
 
+/**
+ * @brief Core class that manages async tasks
+ */
 class EventLoop {
   using TaskList = std::vector<Task *>;
 
+  /** @brief Flag that controls if cycle() should be ran */
   bool running;
 
+  /** @brief Main (sync) context. Saved by cycle() when execution reaches there
+   *         and restored when cycle returns */
   jmp_buf ctx;
+
+  /** @brief Main (sync) stack. Saved by cycle() when execution reaches there
+   *         and restored when cycle returns */
   void * stack;
 
+  /** @brief List of currently executing tasks */
   TaskList tasks;
+
+  /** @brief Index into `tasks` for currently executing task */
   size_t current;
 
+  /** @brief Atomic counter for unique task IDs
+   * TODO: Make static inline? */
   std::atomic<TaskId> task_id_counter;
 
+  /** @brief ThreadPool instance for offloading blocking tasks */
   ThreadPool<> pool;
 
+  /** @brief Synchronizing context */
   struct {
-    std::mutex          mutex;
+    /** @brief Synchronizing mutex (since for now EventLoop is a singleton,
+     *         the mutex is needed because EventLoop APIs may be invoked from
+     *         separate threads) */
+    std::mutex mutex;
+
+    /** @brief List of tasks, that should be started on next cycle (since it's
+     *         not safe to start them in the middle of execution) */
     std::vector<TaskId> to_wake;
+
+    /** @brief A list of task IDs that should wake on next cycle (since it's
+     *         not safe to wake them in the middle of execution) */
     std::vector<Task *> to_start;
   } sync;
 
 public:
+  /** @brief Default constructor */
   EventLoop()
     : running(true),
       ctx(),
@@ -40,10 +66,12 @@ public:
       current(0),
       task_id_counter(0) {}
 
+  /** @brief Destructor (clears all tasks) */
   ~EventLoop() {
     clear();
   }
 
+  /** @brief Deletes tasks, resets state */
   void clear() {
     for (const auto task : tasks) {
       delete task;
@@ -55,6 +83,7 @@ public:
     running = true;
   }
 
+  /** @brief Add task to the loop */
   TaskId addTask(const Task::Worker& fn) {
     const auto id = task_id_counter++;
     auto t = new Task(id, fn);
@@ -64,6 +93,7 @@ public:
     return id;
   }
 
+  /** @brief Add named task to the loop */
   TaskId addTask(const Task::Worker& fn, const std::string& name) {
     const auto id = task_id_counter++;
     auto t = new Task(id, fn, name);
@@ -73,6 +103,7 @@ public:
     return id;
   }
 
+  /** @brief Retrieve TCB pointer by task ID */
   Task * getTask(const TaskId id) const {
     for (auto& task : tasks) {
       if (task->getId() == id) {
@@ -83,6 +114,7 @@ public:
     return nullptr;
   }
 
+  /** @brief Retrieve TCB pointer by task name */
   Task * getTask(const std::string& name) const {
     for (auto& task : tasks) {
       if (task->name == name) {
@@ -93,14 +125,26 @@ public:
     return nullptr;
   }
 
+  /** @brief Retrieve TCB pointer to current task */
   Task * getCurrentTask() const {
     return tasks[current];
   }
 
+  /** @brief Offload a task to a separate thread */
   void addThreadedTask(const ThreadPool<>::Worker& worker) {
     pool.scheduleTask(worker);
   }
 
+  /**
+   * @brief Cycle the EventLoop once
+   *
+   * Stores stack pointer, processes `to_wake` & `to_start` lists, waking
+   * and starting, requested in the previous cycle, tasks. Then retrieves
+   * current task, check if it was just started, if so - initializes it (
+   * creates stack, sets return longjmp point, starts worker), if not -
+   * passes execution to the task worker via setjmp/longjmp. Restores
+   * stack at the end.
+   */
   void cycle() {
     stack = platform::get_stack();
 
@@ -172,6 +216,7 @@ public:
     platform::set_stack(stack);
   }
 
+  /** @brief Calls `cycle()` in a loop until all tasks are completed */
   void runUntilCompleted() {
     while (running) {
       cycle();
@@ -179,17 +224,20 @@ public:
   }
 
 private:
+  /** @brief Atomically get+increment task id */
   TaskId getNextTaskId() {
     const auto id = task_id_counter.load();
     task_id_counter.store(id + 1);
     return id;
   }
 
+  /** @brief Puts task id into to-wake list to be waken at the next cycle */
   void notifyReady(const TaskId id) {
     std::lock_guard lock(sync.mutex);
     sync.to_wake.push_back(id);
   }
 
+  /** @brief Processes `to_wake` & `to_start` */
   void processSync() {
     std::lock_guard lock(sync.mutex);
 

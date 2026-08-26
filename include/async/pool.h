@@ -9,18 +9,27 @@
 
 namespace async {
 
+/**
+ * @brief Implements a simple thread pool, with a fixed number of threads,
+ *        which all block on a cv that is released when a task should be
+ *        executed.
+ *
+ * @tparam T Worker function type
+ */
 template <typename T = std::function<void()>>
 class ThreadPool {
+  /** @brief Used to control the ThreadPool */
   enum Flag {
     FLAG_NONE      = 0,
-    FLAG_STOPPED   = (1 << 0),
-    FLAG_FINISH    = (1 << 1),
-    FLAG_TERMINATE = (1 << 2),
+    FLAG_STOPPED   = (1 << 0), /// ThreadPool is stopped
+    FLAG_FINISH    = (1 << 1), /// Workers should finish current tasks & exit
+    FLAG_TERMINATE = (1 << 2), /// Workers should exit immediately
   };
 
 public:
   using Worker = T;
 
+  /** @brief Creates all threads */
   explicit ThreadPool(size_t thread_count = std::thread::hardware_concurrency())
     : thread_count(thread_count), flags(FLAG_NONE)
   {
@@ -29,12 +38,14 @@ public:
     }
   }
 
+  /** @brief Waits for threads to stop */
   ~ThreadPool() {
     if (!getFlag(FLAG_STOPPED)) {
       waitAll();
     }
   }
 
+  /** @brief Pushed task into the queue and notifies workers */
   void scheduleTask(const T& task) {
     {
       auto lock = std::unique_lock<std::mutex>(pending.mutex);
@@ -43,16 +54,19 @@ public:
     notifier.notify_one();
   }
 
+  /** @brief Sets finish (graceful stop) flag and calls `terminate()` */
   void waitAll() {
     setFlag(FLAG_FINISH, true);
     terminate();
   }
 
+  /** @brief Sets terminate (abrupt stop) flag and calls `terminate()` */
   void terminateAll() {
     setFlag(FLAG_TERMINATE, true);
     terminate();
   }
 
+  /** @brief Clear pending tasks */
   void clear() {
     auto lock = std::unique_lock<std::mutex>(pending.mutex);
 
@@ -62,6 +76,16 @@ public:
   }
 
 private:
+  /**
+   * @brief Worker that is ran by every thread managed by the pool
+   *
+   * In a loop, blocks on a condition_variable, waiting for a queue or a
+   * terminate/finish flag. When a task is pushed into the queue, one
+   * of the workers gets notified, unblocks, pops a task and executes it.
+   * If a finish flag is present, the worker will try to execute remaining
+   * pending tasks and then exit. If a terminate flag is present, the
+   * worker will exit on the spot.
+   */
   void worker() {
     while (true) {
       T task;
@@ -82,6 +106,7 @@ private:
     }
   }
 
+  /** @brief Wakes all threads and joins them one by one  */
   void terminate() {
     notifier.notify_all();
 
@@ -93,11 +118,13 @@ private:
     setFlag(FLAG_STOPPED, true);
   }
 
+  /** @brief Wrapper for atomic flag getter */
   bool getFlag(const uint8_t mask) const {
     uint8_t flags = this->flags.load();
     return (flags & mask) > 0;
   }
 
+  /** @brief Wrapper for atomic flag setter */
   void setFlag(const uint8_t mask, const bool state) {
     uint8_t flags = this->flags.load();
     if (state) {
@@ -109,16 +136,22 @@ private:
   }
 
 private:
+  /** @brief Thread count (may be unneeded) */
   size_t thread_count;
+
+  /** @brief Thread objects */
   std::vector<std::thread> threads;
 
+  /** @brief Queue for pending tasks, guarded by a mutex */
   struct {
     std::queue<T> queue;
     std::mutex    mutex;
   } pending;
 
+  /** @brief Condition variable for worker notifications */
   std::condition_variable notifier;
 
+  /** @brief Atomic ThreadPool flags */
   std::atomic<uint8_t> flags;
 };
 
