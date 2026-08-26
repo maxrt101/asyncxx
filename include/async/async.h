@@ -137,7 +137,7 @@ void gather(Futures&&... futures) {
  * @return Task result
  */
 template <typename T, typename F, typename... Args>
-std::shared_ptr<Future<T>> task(F fn, Args&&... args) {
+std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args) {
   auto f = std::make_shared<Future<T>>();
   auto loop = getGlobalLoop();
 

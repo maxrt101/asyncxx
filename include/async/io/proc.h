@@ -216,6 +216,9 @@ public:
       input(input),
       result(std::make_shared<Result>()) {}
 
+  // TODO: A constructor(s) which receives command as a vector (already split)
+  // TODO: A way to run a user function in spawned process
+
   ~Process() {}
 
   static std::shared_ptr<Process> create(const std::string& command, const std::string& input = "") {
@@ -245,7 +248,7 @@ public:
     this->execute(pipes);
 
     return {
-      .future = async::task<ResultRef>([this, pipes] {
+      .future = async::to_thread<ResultRef>([this, pipes] {
         this->wait(pipes);
         return this->result;
       }),
@@ -266,7 +269,7 @@ public:
 
     state = State::INIT;
 
-    return async::task<ResultRef>([this] {
+    return async::to_thread<ResultRef>([this] {
       const auto pipes = Pipes::create(input);
 
       this->execute(pipes);

@@ -227,7 +227,7 @@ public:
   std::shared_ptr<Future<std::string>> readLine() const {
     assertThrow(handle, FileNotOpenedException());
 
-    return async::task<std::string>([this] {
+    return async::to_thread<std::string>([this] {
       std::string buf;
 
       while (true) {
@@ -261,7 +261,7 @@ public:
   /** @brief Read contents of string `s` into a file */
   std::shared_ptr<Future<>> write(std::string s) const {
     assertThrow(handle, FileNotOpenedException());
-    return async::task([this, s] {
+    return async::to_thread([this, s] {
       assertThrow(fwrite(s.c_str(), s.size(), 1, this->handle) == 1, FileWriteException(filename));
     });
   }
@@ -269,7 +269,7 @@ public:
   /** @brief Write contents of byte vector `buf` into a file */
   std::shared_ptr<Future<>> writeBytes(const std::vector<uint8_t>& buf) const {
     assertThrow(handle, FileNotOpenedException());
-    return async::task([this, buf] {
+    return async::to_thread([this, buf] {
       assertThrow(fwrite(buf.data(), buf.size(), 1, this->handle) == 1, FileWriteException(filename));
     });
   }
@@ -301,7 +301,7 @@ private:
    */
   template <typename T>
   std::shared_ptr<Future<T>> readInner(const size_t n, bool check) const {
-    return async::task<T>([this, n, check] {
+    return async::to_thread<T>([this, n, check] {
       if (n == 0) return T {};
 
       T buf;
@@ -326,7 +326,7 @@ private:
    */
   template <typename T>
   std::shared_ptr<Future<T>> readInnerBuffered() const {
-    return async::task<T>([this] {
+    return async::to_thread<T>([this] {
       T result;
 
       while (true) {
