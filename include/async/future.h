@@ -116,5 +116,10 @@ private:
   }
 };
 
+template <typename T = void>
+using SharedFuture = std::shared_ptr<Future<T>>;
+
+template <typename T = void>
+using UniqueFuture = std::unique_ptr<Future<T>>;
 
 }

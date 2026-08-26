@@ -210,13 +210,13 @@ public:
   }
 
   /** @brief Read `n` ascii chars from file into a string */
-  std::shared_ptr<Future<std::string>> read(const size_t n) const {
+  SharedFuture<std::string> read(const size_t n) const {
     assertThrow(handle, FileNotOpenedException());
     return readInner<std::string>(n, true);
   }
 
   /** @brief Read all data from file into a string */
-  std::shared_ptr<Future<std::string>> readAll() const {
+  SharedFuture<std::string> readAll() const {
     assertThrow(handle, FileNotOpenedException());
     return getFlag(FLAG_PIPE)
       ? readInnerBuffered<std::string>()
@@ -224,7 +224,7 @@ public:
   }
 
   /** @brief Read a line (up to a '\n' or an EOF) from file into a string */
-  std::shared_ptr<Future<std::string>> readLine() const {
+  SharedFuture<std::string> readLine() const {
     assertThrow(handle, FileNotOpenedException());
 
     return async::to_thread([this] {
@@ -245,13 +245,13 @@ public:
   }
 
   /** @brief Read `n` bytes from file into a byte vector */
-  std::shared_ptr<Future<std::vector<uint8_t>>> readBytes(const size_t n) const {
+  SharedFuture<std::vector<uint8_t>> readBytes(const size_t n) const {
     assertThrow(handle, FileNotOpenedException());
     return readInner<std::vector<uint8_t>>(n, true);
   }
 
   /** @brief Read all data from file into a byte vector */
-  std::shared_ptr<Future<std::vector<uint8_t>>> readAllBytes() const {
+  SharedFuture<std::vector<uint8_t>> readAllBytes() const {
     assertThrow(handle, FileNotOpenedException());
     return getFlag(FLAG_PIPE)
       ? readInnerBuffered<std::vector<uint8_t>>()
@@ -259,7 +259,7 @@ public:
   }
 
   /** @brief Read contents of string `s` into a file */
-  std::shared_ptr<Future<>> write(std::string s) const {
+  SharedFuture<> write(std::string s) const {
     assertThrow(handle, FileNotOpenedException());
     return async::to_thread([this, s] {
       assertThrow(fwrite(s.c_str(), s.size(), 1, this->handle) == 1, FileWriteException(filename));
@@ -267,7 +267,7 @@ public:
   }
 
   /** @brief Write contents of byte vector `buf` into a file */
-  std::shared_ptr<Future<>> writeBytes(const std::vector<uint8_t>& buf) const {
+  SharedFuture<> writeBytes(const std::vector<uint8_t>& buf) const {
     assertThrow(handle, FileNotOpenedException());
     return async::to_thread([this, buf] {
       assertThrow(fwrite(buf.data(), buf.size(), 1, this->handle) == 1, FileWriteException(filename));
@@ -300,7 +300,7 @@ private:
    * @param  check Check that fread actually read requested number of bytes
    */
   template <typename T>
-  std::shared_ptr<Future<T>> readInner(const size_t n, bool check) const {
+  SharedFuture<T> readInner(const size_t n, bool check) const {
     return async::to_thread([this, n, check] -> T {
       if (n == 0) return T {};
 
@@ -325,7 +325,7 @@ private:
    * @tparam T Type of container to put the result into (vector or string)
    */
   template <typename T>
-  std::shared_ptr<Future<T>> readInnerBuffered() const {
+  SharedFuture<T> readInnerBuffered() const {
     return async::to_thread([this] -> T {
       T result;
 

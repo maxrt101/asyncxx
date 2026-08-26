@@ -65,7 +65,7 @@ public:
   };
 
   using ResultRef    = std::shared_ptr<Result>;
-  using ResultFuture = std::shared_ptr<Future<ResultRef>>;
+  using ResultFuture = SharedFuture<ResultRef>;
 
   /**
    * @brief Compound result of Process::start()
