@@ -6,7 +6,7 @@
 namespace async {
 
 /**
- * @brief Event task synchronization primitive
+ * @brief Event - Asynchronous task synchronization primitive
  *
  * Event can be waited on, or notified by.
  * If an event is waited on - the task saved it's ID into the event &
@@ -14,6 +14,21 @@ namespace async {
  * suspending it's execution, until it is unblocked (event posted).
  * If an event is notified by - one task calls `notify*()`, which
  * call `async::notify()` on each appropriate task (first one or all).
+ *
+ * Example:
+ * @code{.c}
+ *  auto ev = async::Event::create();
+ *
+ *  auto waiter = async::task([&] {
+ *    ev->wait();
+ *  });
+ *
+ *  auto notifier = async::task([&] {
+ *    ev->notifyOne();
+ *  });
+ *
+ *  async::gather(waiter, notifier);
+ * @endcode
  */
 class Event {
   /** @brief Mutex-guarded list of tasks, that are waiting on this event */
