@@ -2,8 +2,8 @@
 
 #include <unordered_map>
 #include <functional>
+#include <memory>
 #include <string>
-#include <cstdint>
 #include <csetjmp>
 
 /**
