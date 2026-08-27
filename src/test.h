@@ -55,6 +55,7 @@
 /**
  * @brief Declare a test
  *
+ * Example:
  * @code{.c}
  *   auto test_suite = test::TestSuite("test suite");
  *

@@ -16,6 +16,7 @@
  *        worker function, wrapping it's result into a future and
  *        starting the worker as an EventLoop task
  *
+ * Example:
  * @code{.c}
  *   async_task(write_file, std::string contents) {
  *     auto f = async::io::File("test.txt", "w");
@@ -42,6 +43,7 @@
 /**
  * @brief Same as @ref async_task, but pins a provided name to this task
  *
+ * Example:
  * @code{.c}
  *   async_task_n(write_file, "File Writer") {
  *     auto f = async::io::File("test.txt", "w");
@@ -78,6 +80,7 @@
 /**
  * @brief Same as @ref async_task, but adds a custom return type
  *
+ * Example:
  * @code{.c}
  *   async_task_r(read_file_int, int) {
  *     auto f = async::io::File("test.txt", "r");
@@ -106,6 +109,7 @@
 /**
  * @brief Combines @ref async_task_r, and @ref async_task_n
  *
+ * Example:
  * @code{.c}
  *   async_task_n_r(read_file_int, "File Reader", int) {
  *     auto f = async::io::File("test.txt", "r");
@@ -136,6 +140,7 @@
  * @brief Shorthand for creating a main() function and calling
  *        async::run() on a provided function
  *
+ * Example:
  * @code{.c}
  *  async_main() {
  *    auto f = async::io::File("test.txt", "w");
@@ -172,6 +177,7 @@
 /**
  * @brief Same as @ref async_main but includes argc, argv & envp
  *
+ * Example:
  * @code{.c}
  *  async_main_ext() {
  *    auto f = async::io::File("test.txt", "w");

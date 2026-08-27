@@ -183,6 +183,7 @@ std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args) {
  * @brief Run a function in async context from sync context. Basically used
  *        as an entry point into the async runtime
  *
+ * Example:
  * @code{.c}
  *   async::run([] {
  *     auto f = async::io::File("test.txt", "w");
@@ -206,6 +207,7 @@ inline void run(const Task::Worker& fn) {
  * @brief Run an async function in async context from sync context. Basically
  *        used as an entry point into the async runtime
  *
+ * Example:
  * @code{.c}
  *   async_task(write_file) {
  *     auto f = async::io::File("test.txt", "w");
