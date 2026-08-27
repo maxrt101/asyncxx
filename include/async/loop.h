@@ -10,6 +10,14 @@
 
 namespace async {
 
+template <typename T>
+class Future;
+
+struct MainTaskExitedException final : std::runtime_error {
+  MainTaskExitedException()
+    : std::runtime_error("Main task exited while leaving other tasks unfinished") {}
+};
+
 /**
  * @brief Core class that manages async tasks
  */
@@ -37,6 +45,10 @@ class EventLoop {
    * TODO: Make static inline? */
   std::atomic<TaskId> task_id_counter;
 
+  /** @brief Main (parent of all) task id, used to check if main task exited,
+   *         leaving other tasks unfinished */
+  TaskId main_task_id = INVALID_TASK_ID;
+
   /** @brief ThreadPool instance for offloading blocking tasks */
   ThreadPool<> pool;
 
@@ -53,7 +65,7 @@ class EventLoop {
 
     /** @brief A list of task IDs that should wake on next cycle (since it's
      *         not safe to wake them in the middle of execution) */
-    std::vector<Task *> to_start;
+    TaskList to_start;
   } sync;
 
 public:
@@ -64,7 +76,8 @@ public:
       stack(nullptr),
       tasks({}),
       current(0),
-      task_id_counter(0) {}
+      task_id_counter(0),
+      main_task_id(0) {}
 
   /** @brief Destructor (clears all tasks) */
   ~EventLoop() {
@@ -81,22 +94,13 @@ public:
     stack = nullptr;
     current = 0;
     running = true;
+    main_task_id = INVALID_TASK_ID;
   }
 
-  /** @brief Add task to the loop */
-  TaskId addTask(const Task::Worker& fn) {
+  /** @brief Add optionally named task to the loop */
+  TaskId addTask(const Task::Worker& fn, const std::string& name = "") {
     const auto id = task_id_counter++;
-    auto t = new Task(id, fn);
-
-    std::lock_guard lock(sync.mutex);
-    sync.to_start.push_back(t);
-    return id;
-  }
-
-  /** @brief Add named task to the loop */
-  TaskId addTask(const Task::Worker& fn, const std::string& name) {
-    const auto id = task_id_counter++;
-    auto t = new Task(id, fn, name);
+    const auto t = new Task(id, fn, name.empty() ? "Task-" + std::to_string(id) : name);
 
     std::lock_guard lock(sync.mutex);
     sync.to_start.push_back(t);
@@ -168,7 +172,7 @@ public:
       task->stack.id = VALGRIND_STACK_REGISTER(task->stack.data, task->stack.data + task->stack.size);
 #endif
 
-      // TODO: Make aligment configurable (per platform)
+      // TODO: Make alignment configurable (per platform)
       uintptr_t stack_top = reinterpret_cast<uintptr_t>(task->stack.data + task->stack.size);
       stack_top = (stack_top & ~0xFL) - 256;
       platform::set_stack(reinterpret_cast<void*>(stack_top));
@@ -188,6 +192,13 @@ public:
       task->state = Task::State::DONE;
 
       platform::set_stack(stack);
+
+      // Main tasks, spawned by async::run() are considered "main"
+      // If they exit, leaving other tasks unfinished - it is an issue
+      if (main_task_id != INVALID_TASK_ID && main_task_id == task->id) {
+        checkOrphanedTasks();
+      }
+
       return;
     }
 
@@ -238,6 +249,21 @@ private:
     sync.to_wake.push_back(id);
   }
 
+  /** @brief Specify main task id */
+  void setMainTask(const TaskId id) {
+    main_task_id = id;
+  }
+
+  void checkOrphanedTasks() {
+    for (const auto& l : {tasks, sync.to_start}) {
+      for (const auto& t : l) {
+        if (t->state != Task::State::DONE) {
+          throw MainTaskExitedException();
+        }
+      }
+    }
+  }
+
   /** @brief Processes `to_wake` & `to_start` */
   void processSync() {
     std::lock_guard lock(sync.mutex);
@@ -259,6 +285,11 @@ private:
   friend void wait();
   friend void notify(const TaskId id);
   friend void yield();
+
+  friend void run(const Task::Worker& fn);
+
+  template <typename T, typename... Args>
+  friend T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args);
 };
 
 }

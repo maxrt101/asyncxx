@@ -8,7 +8,6 @@
 #include <async/pool.h>
 #include <async/loop.h>
 #include <async/future.h>
-#include <async/event.h>
 #include <async/api.h>
 
 #include "util.h"
@@ -196,8 +195,9 @@ std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args) {
  */
 inline void run(const Task::Worker& fn) {
   const auto loop = getGlobalLoop();
+  const auto id = loop->addTask(fn, "<run>");
 
-  loop->addTask(fn, "<run>");
+  loop->setMainTask(id);
   loop->runUntilCompleted();
   loop->clear();
 }
@@ -230,11 +230,12 @@ T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args) {
 
   std::shared_ptr<Future<T>> f;
 
-  loop->addTask([&f, task, ...args = std::forward<Args>(args)] {
+  const auto id = loop->addTask([&f, task, ...args = std::forward<Args>(args)] {
     f = task(std::move(args)...);
     f->await();
   }, "<run>");
 
+  loop->setMainTask(id);
   loop->runUntilCompleted();
   loop->clear();
 
