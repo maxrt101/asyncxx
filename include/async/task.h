@@ -52,14 +52,19 @@ private:
   FutureState * result_future;
 
 public:
-  Task(const TaskId id, TaskWorker worker, const std::string& name = "<?>", const size_t stack_size = ASYNC_TASK_DEFAULT_STACK_SIZE)
-    : state(State::INIT),
+  Task(
+    const TaskId       id,
+    TaskWorker         worker,
+    const std::string& name       = "<?>",
+    FutureState *      future     = nullptr,
+    const size_t       stack_size = ASYNC_TASK_DEFAULT_STACK_SIZE
+  ) : state(State::INIT),
       id(id),
       name(name),
       worker(std::move(worker)),
       ctx(),
       stack({.data = StackPool::get()->alloc(stack_size), .size = stack_size}),
-      result_future(nullptr) {}
+      result_future(future) {}
 
   ~Task() {
     StackPool::get()->free(stack.data);
@@ -91,6 +96,9 @@ private:
   friend void wait();
   friend void notify(TaskId id);
   friend void yield();
+
+  template <typename T, typename... Args>
+  friend T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args);
 };
 
 }

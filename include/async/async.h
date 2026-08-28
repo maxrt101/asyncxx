@@ -143,7 +143,7 @@ std::shared_ptr<Future<T>> task(F fn, Args&&... args) {
     } else {
       f->complete(fn(std::move(args)...));
     }
-  });
+  }, "", f->getState());
 
   return f;
 }
@@ -233,6 +233,7 @@ T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args) {
 
   const auto id = loop->addTask([&f, task, ...args = std::forward<Args>(args)] {
     f = task(std::move(args)...);
+    self()->result_future = f->getState();
     f->await();
   }, "<run>");
 

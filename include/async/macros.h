@@ -35,7 +35,7 @@
     auto loop = async::getGlobalLoop();                           \
     loop->addTask([f, args...]() {                                \
       __fn ## _worker(args...); f->complete();                    \
-    });                                                           \
+    }, "", f->getState());                                        \
     return f;                                                     \
   }                                                               \
   void __fn ## _worker (__VA_ARGS__)
@@ -63,7 +63,7 @@
     auto loop = async::getGlobalLoop();                           \
     loop->addTask([f, args...]() {                                \
       __fn ## _worker(args...); f->complete();                    \
-    }, __name);                                                   \
+    }, __name, f->getState());                                    \
     return f;                                                     \
   }                                                               \
   void __fn ## _worker (__VA_ARGS__)
@@ -101,7 +101,7 @@
     auto loop = async::getGlobalLoop();                           \
     loop->addTask([f, args...]() {                                \
       f->complete(__fn ## _worker(args...));                      \
-    });                                                           \
+    }, "", f->getState());                                        \
     return f;                                                     \
   }                                                               \
   __ret __fn ## _worker (__VA_ARGS__)
@@ -131,7 +131,7 @@
     auto loop = async::getGlobalLoop();                           \
     loop->addTask([f, args...]() {                                \
       f->complete(__fn ## _worker(args...));                      \
-    }, __name);                                                   \
+    }, __name, f->getState());                                    \
     return f;                                                     \
   }                                                               \
   __ret __fn ## _worker (__VA_ARGS__)

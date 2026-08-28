@@ -91,7 +91,11 @@ public:
     }
   }
 
-private:
+  /**
+   * @brief Returns pointer to FutureState for this instance
+   *
+   * @warning Use with care
+   */
   [[nodiscard]] FutureState * getState() const {
     return state.get();
   }

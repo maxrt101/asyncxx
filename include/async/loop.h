@@ -96,9 +96,9 @@ public:
   }
 
   /** @brief Add optionally named task to the loop */
-  TaskId addTask(const TaskWorker& fn, const std::string& name = "") {
+  TaskId addTask(const TaskWorker& fn, const std::string& name = "", FutureState * future = nullptr) {
     const auto id = task_id_counter++;
-    const auto t = new Task(id, fn, name.empty() ? "Task-" + std::to_string(id) : name);
+    const auto t = new Task(id, fn, name.empty() ? "Task-" + std::to_string(id) : name, future);
 
     std::lock_guard lock(sync.mutex);
     sync.to_start.push_back(t);
@@ -195,6 +195,10 @@ public:
       // If they exit, leaving other tasks unfinished - it is an issue
       if (main_task_id != INVALID_TASK_ID && main_task_id == task->id) {
         checkOrphanedTasks();
+      }
+
+      if (task->result_future && !task->result_future->is_completed()) {
+        task->result_future->cancel();
       }
 
       return;
