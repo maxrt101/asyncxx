@@ -74,7 +74,9 @@ public:
 
     queue = std::queue<T>();
 
-    // TODO: Send cancelled error to every waiter
+    for (auto& waiter : waiters) {
+      waiter.future->cancel();
+    }
 
     waiters.clear();
   }

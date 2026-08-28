@@ -39,7 +39,10 @@ class Event {
 
 public:
   Event() = default;
-  ~Event() = default;
+
+  ~Event() {
+    // TODO: Notify waiters with CancelledException
+  }
 
   /** @brief Shortcut to a make_shared<Event> */
   static std::shared_ptr<Event> create() {
