@@ -1,4 +1,5 @@
 #include <async/async.h>
+#include <async/macros.h>
 #include <test.h>
 
 

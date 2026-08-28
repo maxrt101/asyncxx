@@ -8,8 +8,6 @@
 #include <async/pool.h>
 #include <async/loop.h>
 #include <async/future.h>
-// TODO: Make optional?
-#include <async/macros.h>
 
 #include "util.h"
 
