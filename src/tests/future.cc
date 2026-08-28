@@ -81,3 +81,37 @@ TEST(async_tests, async_future_await, "Async future .await() test") {
 
   TEST_ASSERT(future_value == 42, "Future value is invalid");
 }
+
+TEST(async_tests, async_future_cancel, "Canceled future throws an exception, if awaited") {
+  auto f = async::Future<int>::create();
+  bool cancel_exc_happened_await = false;
+  bool cancel_exc_happened_get = false;
+
+  async::run([&] {
+    auto worker = async::task([&] {
+      try {
+        f->await();
+      } catch (async::CancelledException&) {
+        cancel_exc_happened_await = true;
+      }
+
+      try {
+        f->get();
+      } catch (async::CancelledException&) {
+        cancel_exc_happened_get = true;
+      }
+    });
+
+    auto canceller = async::task([&f] {
+      // Make sure worker awaits
+      async::yield();
+      f->cancel();
+    });
+
+    async::gather(worker, canceller);
+  });
+
+  TEST_ASSERT(cancel_exc_happened_await, "Cancel exception should've been triggered on f->await()");
+  TEST_ASSERT(cancel_exc_happened_get, "Cancel exception should've been triggered on f->get()");
+  TEST_ASSERT(f->is_cancelled(), "Future must have cancel flag set");
+}

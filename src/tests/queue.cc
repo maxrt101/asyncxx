@@ -79,3 +79,30 @@ TEST(async_tests, async_q_multi_consumer, "Async queue with many consumers test"
   TEST_ASSERT_EQ(result1, 42, "Result1 must be 42");
   TEST_ASSERT_EQ(result2, 69, "Result2 must be 69");
 }
+
+
+TEST(async_tests, async_q_cancelled, "Async queue notifies waiters when cleared") {
+  bool cancel_exc_happened = false;
+
+  async::run([&] {
+    auto q = async::Queue<int>::create();
+
+    auto waiter = async::task([&] {
+      try {
+        q->get()->await();
+      } catch (async::CancelledException&) {
+        cancel_exc_happened = true;
+      }
+    });
+
+    auto canceller = async::task([&] {
+      // Make sure that waiter is locked on q
+      async::yield();
+      q->clear();
+    });
+
+    async::gather(waiter, canceller);
+  });
+
+  TEST_ASSERT(cancel_exc_happened, "Queue::clear should notify waiters via CancelledException");
+}
