@@ -1,5 +1,6 @@
 #pragma once
 
+#include <async/defs.h>
 #include <async/task.h>
 #include <async/pool.h>
 #include <async/platform.h>
@@ -9,9 +10,6 @@
 #endif
 
 namespace async {
-
-template <typename T>
-class Future;
 
 struct MainTaskExitedException final : std::runtime_error {
   MainTaskExitedException()
@@ -98,7 +96,7 @@ public:
   }
 
   /** @brief Add optionally named task to the loop */
-  TaskId addTask(const Task::Worker& fn, const std::string& name = "") {
+  TaskId addTask(const TaskWorker& fn, const std::string& name = "") {
     const auto id = task_id_counter++;
     const auto t = new Task(id, fn, name.empty() ? "Task-" + std::to_string(id) : name);
 
@@ -286,7 +284,7 @@ private:
   friend void notify(const TaskId id);
   friend void yield();
 
-  friend void run(const Task::Worker& fn);
+  friend void run(const TaskWorker& fn);
 
   template <typename T, typename... Args>
   friend T run(std::shared_ptr<Future<T>> (task)(Args...), Args&&... args);

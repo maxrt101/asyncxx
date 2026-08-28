@@ -3,12 +3,13 @@
  */
 #pragma once
 
-#include <async/macros.h>
+#include <async/api.h>
 #include <async/task.h>
 #include <async/pool.h>
 #include <async/loop.h>
 #include <async/future.h>
-#include <async/api.h>
+// TODO: Make optional?
+#include <async/macros.h>
 
 #include "util.h"
 
@@ -194,7 +195,7 @@ std::shared_ptr<Future<T>> to_thread(F fn, Args&&... args) {
  *
  * @param fn Async worker function
  */
-inline void run(const Task::Worker& fn) {
+inline void run(const TaskWorker& fn) {
   const auto loop = getGlobalLoop();
   const auto id = loop->addTask(fn, "<run>");
 

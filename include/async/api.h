@@ -4,17 +4,13 @@
  */
 #pragma once
 
-#include <async/task.h>
-#include <async/loop.h>
+#include <async/defs.h>
 
 namespace async {
 
-template <typename T>
-class Future;
-
 inline EventLoop * getGlobalLoop();
 
-inline void run(const Task::Worker& fn);
+inline void run(const TaskWorker& fn);
 inline void exit();
 inline void wait();
 inline void notify(TaskId id);

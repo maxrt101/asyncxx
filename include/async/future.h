@@ -1,10 +1,8 @@
 #pragma once
 
-#include <mutex>
-
-#include <async/task.h>
-#include <async/exc.h>
 #include <async/api.h>
+#include <async/exc.h>
+#include <async/internal/future_state.h>
 
 namespace async {
 
@@ -32,40 +30,21 @@ class Future {
   /** @brief Alias for computation result, resolved to `Empty` if T=void */
   using Result = std::conditional_t<std::is_void_v<T>, Empty, T>;
 
-  /** @brief Atomic flag which signifies the computation completion */
-  std::atomic<bool> completed;
-
-  /** @brief Atomic flag which signifies the computation cancellation */
-  std::atomic<bool> cancelled;
-
-  /** @brief List of those who wait for this future to finish */
-  struct {
-    std::vector<TaskId> list;
-    std::mutex          mutex;
-  } waiters;
+  UniqueFutureState state;
 
   /** @brief Stores the result of the computation */
   Result result;
 
 public:
-  Future()
-    : completed(false),
-      cancelled(false),
-      waiters(),
-      result() {}
+  Future() : state(FutureState::create()), result() {}
 
   /** @brief Shortcut for a make_shared<Future> */
   static std::shared_ptr<Future> create() {
     return std::make_shared<Future>();
   }
 
-  bool is_completed() const {
-    return completed.load();
-  }
-
-  bool is_cancelled() const {
-    return cancelled.load();
-  }
+  bool is_completed() const { return state->is_completed(); }
+  bool is_cancelled() const { return state->is_cancelled(); }
 
   /** @brief Returns result, if T!=void, if future is completed, otherwise throws */
   auto get() {
@@ -81,21 +60,18 @@ public:
   template<typename U = T>
   void complete(std::enable_if_t<!std::is_void_v<U>, U> val) {
     result = val;
-    completed.store(true);
-    notifyAll();
+    state->complete();
   }
 
   /** @brief Completes the future, notifying waiters */
-  void complete() {
+  void complete() const {
     static_assert(std::is_void_v<T>, "complete() without args is only for Future<void>");
-    completed.store(true);
-    notifyAll();
+    state->complete();
   }
 
   /** @brief Cancels the future, notifying waiters */
-  void cancel() {
-    cancelled.store(true);
-    notifyAll();
+  void cancel() const {
+    state->cancel();
   }
 
   /** @brief Blocks caller task until the future is completed */
@@ -104,7 +80,7 @@ public:
       return get();
     }
 
-    saveWaiter();
+    state->saveWaiter(self()->getId());
     wait();
 
     if (is_cancelled()) throw CancelledException();
@@ -116,20 +92,8 @@ public:
   }
 
 private:
-  /** @brief Saves current task ID into waiters list */
-  void saveWaiter() {
-    auto lock = std::unique_lock(waiters.mutex);
-
-    waiters.list.push_back(self()->getId());
-  }
-
-  /** @brief Notifies all waiting tasks */
-  void notifyAll() {
-    auto lock = std::unique_lock(waiters.mutex);
-
-    for (auto& task : waiters.list) {
-      notify(task);
-    }
+  [[nodiscard]] FutureState * getState() const {
+    return state.get();
   }
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace async {
+namespace async::io {
 
 class Socket {
 
