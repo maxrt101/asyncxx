@@ -3,6 +3,7 @@
 #include <mutex>
 
 #include <async/task.h>
+#include <async/exc.h>
 #include <async/api.h>
 
 namespace async {
@@ -34,6 +35,9 @@ class Future {
   /** @brief Atomic flag which signifies the computation completion */
   std::atomic<bool> completed;
 
+  /** @brief Atomic flag which signifies the computation cancellation */
+  std::atomic<bool> cancelled;
+
   /** @brief List of those who wait for this future to finish */
   struct {
     std::vector<TaskId> list;
@@ -46,6 +50,7 @@ class Future {
 public:
   Future()
     : completed(false),
+      cancelled(false),
       waiters(),
       result() {}
 
@@ -58,8 +63,13 @@ public:
     return completed.load();
   }
 
-  /** @brief Returns result, if T!=void, if future is completed, otherwise throws*/
+  bool is_cancelled() const {
+    return cancelled.load();
+  }
+
+  /** @brief Returns result, if T!=void, if future is completed, otherwise throws */
   auto get() {
+    if (is_cancelled()) throw CancelledException();
     if (!is_completed()) throw FutureNotReadyException();
 
     if constexpr (!std::is_void_v<T>) {
@@ -82,6 +92,12 @@ public:
     notifyAll();
   }
 
+  /** @brief Cancels the future, notifying waiters */
+  void cancel() {
+    cancelled.store(true);
+    notifyAll();
+  }
+
   /** @brief Blocks caller task until the future is completed */
   auto await() {
     if (is_completed()) {
@@ -91,6 +107,7 @@ public:
     saveWaiter();
     wait();
 
+    if (is_cancelled()) throw CancelledException();
     if (!is_completed()) throw FutureFailedToCompleteException();
 
     if constexpr (!std::is_void_v<T>) {
