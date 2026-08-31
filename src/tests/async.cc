@@ -170,18 +170,19 @@ async_task(async_exit) {
 }
 
 TEST(async_tests, async_exit, "Async exit test") {
+  bool exc_happened = false;
   after_exit = false;
 
-  async::run([] {
-    async_exit();
-    // Needed, because if async_exit is not awaited - MainTaskExitedException
-    // will be thrown, if run() won't await it - the future will never get
-    // completed, and a deadlock will happen
-    // TODO: Throw CancelledException
-    async::yield();
+  async::run([&] {
+    try {
+      async_exit()->await();
+    } catch (async::CancelledException&) {
+      exc_happened = true;
+    }
   });
 
   TEST_ASSERT(!after_exit, "Task didn't exit");
+  TEST_ASSERT(exc_happened, "CancelledException didn't happen");
 }
 
 
