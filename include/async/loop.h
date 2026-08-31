@@ -180,9 +180,9 @@ public:
       try {
         task->worker();
       } catch (...) {
-#if !ASYNC_CONTINUE_ON_TASK_EXC
         task->state = Task::State::DONE;
         platform::set_stack(stack);
+#if !ASYNC_CONTINUE_ON_TASK_EXC
         throw;
 #endif
       }
@@ -190,16 +190,6 @@ public:
       task->state = Task::State::DONE;
 
       platform::set_stack(stack);
-
-      // Main tasks, spawned by async::run() are considered "main"
-      // If they exit, leaving other tasks unfinished - it is an issue
-      if (main_task_id != INVALID_TASK_ID && main_task_id == task->id) {
-        checkOrphanedTasks();
-      }
-
-      if (task->result_future && !task->result_future->is_completed()) {
-        task->result_future->cancel();
-      }
 
       return;
     }
@@ -211,10 +201,7 @@ public:
       VALGRIND_STACK_DEREGISTER(task->stack.id);
 #endif
 
-      delete task;
-
-      tasks.erase(tasks.begin() + current);
-      if (tasks.size() == 0) running = false;
+      cleanUpTask(task);
 
       return;
     }
@@ -263,6 +250,26 @@ private:
           throw MainTaskExitedException();
         }
       }
+    }
+  }
+
+  void cleanUpTask(Task * task) {
+    // Main tasks, spawned by async::run() are considered "main"
+    // If they exit, leaving other tasks unfinished - it is an issue
+    if (main_task_id != INVALID_TASK_ID && main_task_id == task->id) {
+      checkOrphanedTasks();
+    }
+
+    if (task->result_future && !task->result_future->is_completed()) {
+      task->result_future->cancel();
+    }
+
+    delete task;
+
+    tasks.erase(tasks.begin() + current);
+
+    if (tasks.size() == 0) {
+      running = false;
     }
   }
 
