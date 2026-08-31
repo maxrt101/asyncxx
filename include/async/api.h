@@ -5,6 +5,7 @@
 #pragma once
 
 #include <async/defs.h>
+#include <memory>
 
 namespace async {
 
